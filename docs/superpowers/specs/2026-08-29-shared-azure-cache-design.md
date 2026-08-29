@@ -1,6 +1,6 @@
 # DevDeck/waypoint 共有 Azure DevOps キャッシュ設計
 
-- 日付: 2026-08-29
+- 日付: 2026-08-29 (v2: 中立な共有キャッシュ方式に変更)
 - 対象リポジトリ: DevDeck (本リポジトリ) と waypoint (`C:\Users\<user>\source\repos\waypoint`、別リポジトリ)
 - スコープ: 両アプリが同じ Azure DevOps 組織を独立にポーリングし、API 呼び出しとローカルストレージが重複していた問題を解消する。
 
@@ -14,47 +14,83 @@ Pipeline / Work Item を検索するために、自前で 12 時間ごとのフ�
 組織/プロジェクトに対して両アプリが独立にポーリングするため、API 呼び出しが二重になり、
 ローカルストレージも同じ情報を二重に持っていた。
 
-## 決定した設計
+## v1 からの変更
 
-- **Active PR・Work Item**: DevDeck の SQLite (`%APPDATA%\com.azdodeck.app\azdodeck.sqlite3`)
-  を唯一の情報源にする。waypoint はこれを読み取り専用で直接参照し (`azure_devops::devdeck_cache`)、
-  自前のバックグラウンド同期を廃止した。DevDeck 側は waypoint の存在を意識しない一方向の依存。
-- **Pipeline**: DevDeck 側に元々キャッシュが無い (オンデマンド API 呼び出しのみ) ため、
-  waypoint 側も永続キャッシュを廃止し、`az pipeline ` に入るたびに明示的な選択 (Enter) を
-  トリガーに Live 検索する形に変更した (`search_pipelines_live_async`)。
+最初の設計 (v1) は waypoint が DevDeck の SQLite (`azdodeck.sqlite3`) を読み取り専用で直接
+参照する一方向の依存だった。実装コストは低いが、waypoint が DevDeck の**内部スキーマ**
+(テーブル名・列名) に直接依存する形になり、「互いのアプリの存在を意識せず、対等に同期する」
+という要件を満たさなかった。DevDeck が起動していない間は waypoint 側のデータが更新されない
+一方向の依存でもあった。v2 ではどちらの内部スキーマにも属さない中立な第三のキャッシュへ
+両アプリが読み書きする形に変更した。
+
+## 決定した設計 (v2)
+
+- **中立な共有キャッシュ**: `%APPDATA%\AzDoSharedCache\cache.db`。DevDeck・waypoint のどちらの
+  クレート/型も import しない。スキーマは Azure DevOps の生の事実のみを持ち、`is_mine` の
+  ような per-viewer の判断は持たない (各アプリが自分の `authenticated_user_id` と
+  `created_by_id` / レビュアー一覧を突き合わせて自分で計算する)。
+  ```sql
+  pull_requests(organization, project, repository_id, repository_name, pull_request_id,
+                title, status, created_by, created_by_id, creation_date,
+                source_ref_name, target_ref_name, is_draft, web_url)
+  pull_request_reviewers(organization, project, repository_id, pull_request_id,
+                          reviewer_id, vote, is_required)
+  work_items(organization, project, id, title, work_item_type, state, assigned_to,
+             assigned_to_unique_name, changed_date, web_url, tags)
+  sync_state(organization, project, kind, synced_at, synced_by, last_error)  -- ヘッダ。エントリ本体とは独立
+  cache_meta(key, value)  -- schema_version
+  ```
+- **鮮度判定は呼び出し側のポリシー**: `sync_state` を見て「直近 (自分でも相手でも) 更新済みか」
+  だけを判定する。しきい値は両アプリで揃える必要はなく、各アプリが自分の同期間隔に合わせて
+  選ぶ (DevDeck は 2 分、waypoint は 10 分。理由は後述)。
+- **Pipeline**: どちらのアプリも元々永続キャッシュしていなかった (DevDeck はオンデマンド API
+  呼び出しのみ) ため、共有キャッシュの対象外のまま。waypoint は `az pipeline ` に入るたびに
+  明示的な選択 (Enter) をトリガーに Live 検索する (`search_pipelines_live_async`、v1 のまま)。
 - **PR の Completed/Abandoned 履歴 (過去 90 日ぶん)**: DevDeck は Active PR しか同期しない
-  仕様上の制約があるため対象外。waypoint 自身の SQLite キャッシュとしてそのまま維持する
-  (12 時間ごとのバックグラウンド同期は履歴分だけに縮小)。
+  仕様上の制約があり対象外。waypoint 自身の SQLite キャッシュとして維持する
+  (12 時間ごとのバックグラウンド同期は履歴分だけ、v1 のまま)。
 
 ### DevDeck 側の変更
 
-- `SCHEMA_VERSION` 19 → 20。`pull_requests` に `created_by_id TEXT` 列を追加するマイグレーション
-  ステップを追加 (`db/migrate.rs`)。waypoint の is_mine 判定 (作成者 GUID との一致) に必要。
-  既存の PR 取得コードは元々 `createdBy.id` を取得していたが破棄していたため、新規 API 呼び出しは
-  不要 (`prs/sync_fetch.rs`)。
-- `db/prs.rs` の `CachedPr` / INSERT・SELECT 文に `created_by_id` を追加。
-- `docs/spec-overview.md` にスキーマの「外部消費者」節を追加し、`AGENTS.md` にも
-  `pull_requests` / `work_items` / `review_pull_requests` / `organizations` が waypoint との
-  契約になっている旨を注記した。
+- 新規 `src-tauri/src/shared_cache/` (`mod.rs` / `pull_requests.rs` / `work_items.rs`):
+  上記スキーマの読み書きヘルパー。DevDeck は Active PR について読み書き両方、Work Item は
+  書き込みのみ実装する (理由は下記「非対称にした理由」)。
+- `prs/sync_fetch.rs::fetch_active_prs_for_project`: 呼び出しの先頭で共有キャッシュの鮮度を
+  確認し、直近 2 分以内に更新済みなら Azure DevOps API を叩かずそこから読んだ内容を
+  `CachedPr` へ変換して返す。古ければ従来通り取得し、成功後に結果 (と `reviewers` 配列から
+  抽出したレビュアー一覧) を共有キャッシュへも書く。
+- `work_items/sync.rs::fetch_project_work_items`: 「全件」取得結果を毎回共有キャッシュへ
+  書き込む (読み取りゲートなし)。フル同期なら `write_work_items` (全置換)、差分同期なら
+  `upsert_work_items` (差分件だけ upsert、既存行を消さない) を使い分ける
+  (`was_full_sync` を `do_sync_work_items` から渡す)。
+- `pull_requests.created_by_id` (SCHEMA_VERSION 20 で追加した列) はそのまま DevDeck 内部で
+  使う。共有キャッシュへ書く際のソースになるだけで、直接公開されるわけではない。
 
 ### waypoint 側の変更
 
-- 新規 `azure_devops/devdeck_cache.rs`: DevDeck の DB を `SQLITE_OPEN_READ_ONLY` で開き、
-  `pull_requests` (Active) と `work_items` を `organizations` と JOIN して Quick Launch の
-  `Candidate` へ変換する。is_mine は `created_by_id = organizations.authenticated_user_id`
-  OR `review_pull_requests` に該当行が存在するか、で判定する。`created_by_id` 列が無い
-  古い DevDeck の DB (マイグレーション未適用) では `prepare` が失敗するので、その場合は
-  レビュアー判定のみのクエリへフォールグレードする。DevDeck の DB が無い/開けない場合は
-  空リストを返して継続する。
-- `azure_devops::api::fetch_pull_requests` → `fetch_pull_request_history` に縮小し、Active の
-  取得を削除 (Completed/Abandoned のみ)。`refresh_project` から Pipeline・Work Item の取得を
-  削除し、PR 履歴の同期だけを行う。
-- `azure_devops::sync::refresh_work_items_delta_async` を削除 (DevDeck が Work Item の鮮度を
-  担うため不要)。新規 `search_pipelines_live_async` / `PipelineFilter` (旧 `quick_launch::azure`
-  から `azure_devops` へ移設) を追加。
-- Quick Launch 側 (`quick_launch_window`) に Pipeline 用のライブ検索状態・`Action::AzureLivePipelineSearch`
-  を、既存の PR/Work Item ライブ検索と同じ形で追加。
-- `docs/spec.md` の FR-9.18.1 / FR-9.18.3 を更新。
+- `azure_devops/devdeck_cache.rs` を削除し、`azure_devops/shared_cache/` (`mod.rs` /
+  `pull_requests.rs` / `work_items.rs`) に置き換え。DevDeck 側と同じスキーマに対する
+  読み書きヘルパー (waypoint は PR も Work Item も読み書き両方実装)。
+- `cache.rs` に `identity` テーブルを追加。`cached_candidates` はネットワークに触れない
+  同期経路 (Quick Launch のキー入力経路) なので、is_mine 判定に要る「自分の
+  `authenticated_user_id`」をその場で解決できない。`api.rs::refresh_project` が
+  (PR/Work Item 取得の成否・スキップに関わらず毎回) `current_user_id` を解決してこの
+  テーブルへ書いておき、`cached_candidates` はここを同期的に読む。
+- `api.rs::refresh_project`: PR の Completed/Abandoned 履歴は従来通り取得・
+  `replace_project_cache` へ保存。Active PR と Work Item は共有キャッシュの鮮度を見て
+  スキップ判定し、取得した場合は共有キャッシュにだけ書く (waypoint 自身の DB には複製
+  しない)。
+- `mod.rs::cached_candidates` / `cached_work_item_candidates`: 共有キャッシュを直接読み、
+  is_mine は `created_by_id` / レビュアー一覧と `cache::read_identity` を突き合わせて計算する。
+
+### 非対称にした理由 (DevDeck の Work Item は書き込みのみ)
+
+DevDeck の Work Item 同期はフル/差分の 2 モードと「全件」「自分の担当分」の 2 系統が絡み合う
+既存ロジックで、読み取りスキップを安全に組み込むには "フル相当として扱うか差分として
+upsert するか" の判断をプロジェクト単位で持ち回る必要があり、リスクに見合わないと判断した。
+DevDeck 自身の同期間隔 (5分) が waypoint (10分しきい値で判定) より確実に新しいため、
+書き込みのみでも実用上の効果はほぼ変わらない。PR 側は同期ロジックがシンプルなので
+双方向にした。
 
 ## 既知の制約 (非対応)
 
@@ -65,7 +101,7 @@ DevDeck は「複数組織のうち 1 つだけがアクティブ同期対象」
 
 ## 検証
 
-- DevDeck: `cargo test --workspace` (222 + 154 + 6 件、全パス)、
-  `cargo clippy --workspace --all-targets -- -D warnings`、`cargo fmt`。
-- waypoint: `cargo test` (lib 136 件 + 各統合テストバイナリ、全パス)、
-  `cargo clippy --all-targets -- -D warnings`、`cargo fmt`。
+- DevDeck: `cargo test --workspace` (231 + 154 + 6 件、全パス)、
+  `cargo clippy --workspace --all-targets -- -D warnings`、`cargo fmt` (変更ファイルのみ)。
+- waypoint: `cargo test` (lib 138 件 + 各統合テストバイナリ、全パス)、
+  `cargo clippy --all-targets -- -D warnings`、`cargo fmt` (変更ファイルのみ)。

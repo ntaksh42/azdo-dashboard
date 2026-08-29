@@ -10,6 +10,7 @@ use super::*;
 use azdo_client::TeamProject;
 use tokio::task::JoinSet;
 
+use crate::shared_cache;
 use crate::sync::SyncBudget;
 
 pub(super) const SYNC_WI_WIQL: &str =
@@ -90,6 +91,12 @@ struct ProjectWorkItemFetch {
 
 /// Fetches one project's "all" and "my" work items together under a single
 /// budget permit, so project-level parallelism is bounded by the shared budget.
+///
+/// `was_full_sync` decides how the "all" result is written to the shared
+/// cache (`shared_cache` module, read by waypoint): a full result replaces
+/// that project's rows outright, while a delta result only carries items
+/// that changed and must be upserted rather than replacing the snapshot.
+#[allow(clippy::too_many_arguments)]
 async fn fetch_project_work_items(
     client: AdoClient,
     org: Organization,
@@ -97,6 +104,7 @@ async fn fetch_project_work_items(
     all_wiql: String,
     fields: Vec<String>,
     budget: SyncBudget,
+    was_full_sync: bool,
 ) -> ProjectWorkItemFetch {
     let _permit = budget.acquire_owned().await;
     let (all_result, my_result) = tokio::join!(
@@ -122,12 +130,65 @@ async fn fetch_project_work_items(
     let result = match (all_result, my_result) {
         (Err(e), _) | (_, Err(e)) => Err(e),
         (Ok(None), _) | (_, Ok(None)) => Ok(None),
-        (Ok(Some(all)), Ok(Some(my))) => Ok(Some((all, my))),
+        (Ok(Some(all)), Ok(Some(my))) => {
+            write_all_work_items_to_shared_cache(&org, &project, &all.items, was_full_sync);
+            Ok(Some((all, my)))
+        }
     };
     ProjectWorkItemFetch {
         project_id: project.id,
         project_name: project.name,
         result,
+    }
+}
+
+/// Best-effort mirror of the "all work items" result into the shared cache
+/// for waypoint's benefit. DevDeck never reads this back for itself (unlike
+/// PRs, this sync is not gated on the shared cache's freshness — the
+/// full/delta interaction below is intricate enough that adding a read-side
+/// skip here was judged not worth the risk); this is a pure write-through.
+fn write_all_work_items_to_shared_cache(
+    org: &Organization,
+    project: &TeamProject,
+    items: &[CachedWorkItem],
+    was_full_sync: bool,
+) {
+    let rows: Vec<shared_cache::SharedWorkItem> = items
+        .iter()
+        .map(|item| shared_cache::SharedWorkItem {
+            id: item.id,
+            title: item.title.clone(),
+            work_item_type: item.work_item_type.clone(),
+            state: item.state.clone(),
+            assigned_to: item.assigned_to.clone(),
+            assigned_to_unique_name: item.assigned_to_unique_name.clone(),
+            changed_date: item.changed_date.clone(),
+            web_url: item.web_url.clone(),
+            tags: item.tags.clone(),
+        })
+        .collect();
+    let outcome = (|| -> Result<()> {
+        let mut conn = shared_cache::open()?;
+        if was_full_sync {
+            shared_cache::write_work_items(&mut conn, &org.name, &project.name, &rows)?;
+        } else {
+            shared_cache::upsert_work_items(&mut conn, &org.name, &project.name, &rows)?;
+        }
+        shared_cache::mark_synced(
+            &conn,
+            &org.name,
+            &project.name,
+            shared_cache::KIND_WORK_ITEMS,
+            shared_cache::SYNCED_BY,
+        )
+    })();
+    if let Err(e) = outcome {
+        tracing::warn!(
+            org = %org.name,
+            project = %project.name,
+            error = %e,
+            "failed to write work items to the shared cache"
+        );
     }
 }
 
@@ -190,6 +251,7 @@ pub(super) async fn do_sync_work_items(
 ) -> Result<SyncWorkItemsResult> {
     let fields: Vec<String> = WORK_ITEM_FIELDS.iter().map(ToString::to_string).collect();
     let delta_since = delta_sync_since(db, org);
+    let was_full_sync = delta_since.is_none();
     let all_wiql = match delta_since.as_deref() {
         Some(since) => wiql_with_changed_date_filter(SYNC_WI_WIQL, since),
         None => SYNC_WI_WIQL.to_string(),
@@ -213,6 +275,7 @@ pub(super) async fn do_sync_work_items(
             all_wiql.clone(),
             fields.clone(),
             budget.clone(),
+            was_full_sync,
         ));
     }
 
@@ -258,7 +321,6 @@ pub(super) async fn do_sync_work_items(
     }
 
     let synced_ids: Vec<&str> = synced_project_ids.iter().map(String::as_str).collect();
-    let was_full_sync = delta_since.is_none();
     if was_full_sync {
         db.replace_work_items(&org.id, &synced_ids, &all_cached, &my_cached)?;
     } else {

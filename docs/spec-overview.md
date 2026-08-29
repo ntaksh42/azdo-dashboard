@@ -207,14 +207,18 @@ Notifications (未読通知件数、99 超は「99+」)。0/未取得時は非�
   (最大 200)、コミット、コミット↔PR 関連、各種 FTS インデックス、同期状態、スヌーズ、
   PR コメント既読、メンション/割当先履歴、通知履歴 (`notifications`)、アプリ設定。
 - ジャーナル: WAL、`synchronous=NORMAL`、外部キー ON。
-- **外部消費者**: 同じ端末で動く別アプリ waypoint (`C:\Users\<user>\source\repos\waypoint`)
-  が、この SQLite ファイル (`%APPDATA%\com.azdodeck.app\azdodeck.sqlite3`) を読み取り専用で
-  直接参照し、Quick Launch の Active PR / Work Item 候補を表示する (waypoint 自身は Azure
-  DevOps を二重にポーリングしない)。参照されるのは `pull_requests` (`created_by_id` は
-  waypoint の is_mine 判定に必須)、`work_items`、`review_pull_requests`、`organizations`
-  (`authenticated_user_id`) の各テーブル。これらのテーブル・列を変更する際は waypoint 側の
-  クエリが壊れないよう互換性を意識すること (waypoint はスキーマ不一致時に空リストへ
-  フォールバックする設計だが、無言でデータが消えるだけなので変更時は注意する)。
+- **共有キャッシュ (`shared_cache/`)**: `azdodeck.sqlite3` 自体は DevDeck 専用で、外部からは
+  読まれない。別アプリ waypoint (`C:\Users\<user>\source\repos\waypoint`) が同じ Azure
+  DevOps 組織を独立にポーリングするのを避けるため、Active PR (+レビュアー一覧) と
+  Work Item を同期成功のたびに中立な第三の SQLite ファイル
+  (`%APPDATA%\AzDoSharedCache\cache.db`) へ書き込む (`prs/sync_fetch.rs` /
+  `work_items/sync.rs`)。Active PR の同期前にはこの共有キャッシュが直近 (waypoint 側で)
+  更新済みでないか確認し、更新済みならその内容を読んで自分の API 呼び出しをスキップする
+  (`shared_cache::is_fresh`)。共有スキーマは DevDeck 自身のテーブル形と無関係な独立の契約
+  (Azure DevOps の生の事実のみ、is_mine 等の per-viewer 判断は持たない) なので、
+  `pull_requests` / `work_items` 自体の列を変更しても `shared_cache` 側のマッピングさえ
+  追従させれば waypoint 側は壊れない。Work Item は書き込みのみで読み取りゲートは持たない
+  (差分/フル同期の込み入った既存ロジックに読み取りスキップを組み込むリスクが高いと判断)。
 
 ### 同期ループ (`sync.rs`)
 

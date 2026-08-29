@@ -1,9 +1,19 @@
+use std::time::Duration;
+
 use azdo_client::{AdoClient, PullRequestStatus, TeamProject};
 
 use super::*;
 use crate::commits::encode_path_segment;
 use crate::db::{CachedPr, CachedReviewPr, Organization};
 use crate::error::Result;
+use crate::shared_cache::{self, SharedPullRequest, SharedReviewer};
+
+/// How stale the shared cache (`shared_cache` module) may be before this app
+/// falls back to fetching from Azure DevOps itself. Chosen well under
+/// DevDeck's own ~5 minute sync interval so this app's own cadence is
+/// essentially unaffected; it only skips a fetch on the rare occasion the
+/// other app (waypoint) refreshed this scope moments earlier.
+const SHARED_CACHE_FRESHNESS: Duration = Duration::from_secs(120);
 
 // One project-level query replaces a request per repository; repositories
 // with zero active PRs simply contribute nothing.
@@ -14,6 +24,15 @@ pub(crate) async fn fetch_active_prs_for_project(
 ) -> PrProjectFetch {
     let project_id = project.id.clone();
     let label = project.name.clone();
+
+    if let Some(cached) = read_active_prs_from_shared_cache(&org, &project) {
+        return PrProjectFetch {
+            project_id,
+            label,
+            result: Ok(cached),
+        };
+    }
+
     let prs = match client
         .list_project_pull_requests(&project.id, PullRequestStatus::Active, PROJECT_PR_SYNC_TOP)
         .await
@@ -43,7 +62,28 @@ pub(crate) async fn fetch_active_prs_for_project(
         }
     };
 
-    let cached = prs
+    // Reviewers are read from `prs` by reference before the by-value pass
+    // below consumes each `pr` to build `CachedPr`; both passes read the same
+    // API response, just for different destinations (DevDeck's own cache vs
+    // the shared cache's generic reviewer facts).
+    let shared_reviewers: Vec<SharedReviewer> = prs
+        .iter()
+        .filter_map(|pr| {
+            let repo = pr.repository.as_ref()?;
+            Some(pr.reviewers.iter().flatten().filter_map(move |reviewer| {
+                Some(SharedReviewer {
+                    repository_id: repo.id.clone(),
+                    pull_request_id: pr.pull_request_id,
+                    reviewer_id: reviewer.id.clone()?,
+                    vote: reviewer.vote,
+                    is_required: reviewer.is_required,
+                })
+            }))
+        })
+        .flatten()
+        .collect();
+
+    let cached: Vec<CachedPr> = prs
         .into_iter()
         .filter_map(|pr| {
             let Some(repo) = pr.repository else {
@@ -87,10 +127,101 @@ pub(crate) async fn fetch_active_prs_for_project(
             })
         })
         .collect();
+
+    write_active_prs_to_shared_cache(&org, &project, &cached, &shared_reviewers);
+
     PrProjectFetch {
         project_id,
         label,
         result: Ok(cached),
+    }
+}
+
+/// `None` when the shared cache is missing, unreadable, or not fresh enough
+/// (including when no one has ever synced this scope) — the caller falls
+/// back to fetching from Azure DevOps itself in every such case.
+fn read_active_prs_from_shared_cache(
+    org: &Organization,
+    project: &TeamProject,
+) -> Option<Vec<CachedPr>> {
+    let conn = shared_cache::open().ok()?;
+    if !shared_cache::is_fresh(
+        &conn,
+        &org.name,
+        &project.name,
+        shared_cache::KIND_PULL_REQUESTS,
+        SHARED_CACHE_FRESHNESS,
+    ) {
+        return None;
+    }
+    let rows = shared_cache::read_pull_requests(&conn, &org.name, &project.name).ok()?;
+    Some(
+        rows.into_iter()
+            .map(|row| CachedPr {
+                org_id: org.id.clone(),
+                project_id: project.id.clone(),
+                project_name: project.name.clone(),
+                repository_id: row.repository_id,
+                repository_name: row.repository_name,
+                pull_request_id: row.pull_request_id,
+                title: row.title,
+                status: row.status,
+                created_by: row.created_by,
+                created_by_id: row.created_by_id,
+                creation_date: row.creation_date,
+                source_ref_name: row.source_ref_name,
+                target_ref_name: row.target_ref_name,
+                web_url: row.web_url,
+                is_draft: row.is_draft,
+            })
+            .collect(),
+    )
+}
+
+/// Best-effort: a failure to reach the shared cache never fails DevDeck's own
+/// sync, since the data is already safely in DevDeck's own cache by the time
+/// this runs.
+fn write_active_prs_to_shared_cache(
+    org: &Organization,
+    project: &TeamProject,
+    cached: &[CachedPr],
+    reviewers: &[SharedReviewer],
+) {
+    let rows: Vec<SharedPullRequest> = cached
+        .iter()
+        .map(|pr| SharedPullRequest {
+            repository_id: pr.repository_id.clone(),
+            repository_name: pr.repository_name.clone(),
+            pull_request_id: pr.pull_request_id,
+            title: pr.title.clone(),
+            status: pr.status.clone(),
+            created_by: pr.created_by.clone(),
+            created_by_id: pr.created_by_id.clone(),
+            creation_date: pr.creation_date.clone(),
+            source_ref_name: pr.source_ref_name.clone(),
+            target_ref_name: pr.target_ref_name.clone(),
+            is_draft: pr.is_draft,
+            web_url: pr.web_url.clone(),
+        })
+        .collect();
+    let outcome = (|| -> Result<()> {
+        let mut conn = shared_cache::open()?;
+        shared_cache::write_pull_requests(&mut conn, &org.name, &project.name, &rows, reviewers)?;
+        shared_cache::mark_synced(
+            &conn,
+            &org.name,
+            &project.name,
+            shared_cache::KIND_PULL_REQUESTS,
+            shared_cache::SYNCED_BY,
+        )
+    })();
+    if let Err(e) = outcome {
+        tracing::warn!(
+            org = %org.name,
+            project = %project.name,
+            error = %e,
+            "failed to write active PRs to the shared cache"
+        );
     }
 }
 

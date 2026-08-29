@@ -20,6 +20,7 @@ mod prs;
 mod search;
 mod secrets;
 mod settings;
+mod shared_cache;
 mod snooze;
 mod sync;
 mod work_items;

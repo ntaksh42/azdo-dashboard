@@ -129,12 +129,21 @@ constant in `src-tauri/src/db/mod.rs` (currently `20`). `migrate()` applies each
 `if current < N` step in order and must stay repeatable; add a new numbered
 step rather than editing an existing one.
 
-The SQLite file itself (`azdodeck.sqlite3`) is also read directly, read-only,
-by a separate app (waypoint) for its Quick Launch Azure DevOps candidates, so
-it doubles as a cross-app data contract. Changing or removing columns on
-`pull_requests` (including `created_by_id`), `work_items`,
-`review_pull_requests`, or `organizations` can silently break that consumer;
-check it when touching those tables.
+`azdodeck.sqlite3` itself is private to this app; nothing outside DevDeck
+reads it directly. A separate app (waypoint, its own repository) polls the
+same Azure DevOps organization for its Quick Launch Active PR / Work Item
+candidates, so to avoid both apps hitting the API independently,
+`src-tauri/src/shared_cache/` mirrors a small, neutral projection of
+`pull_requests` (plus reviewers) and `work_items` into a third SQLite file at
+`%APPDATA%\AzDoSharedCache\cache.db` after every successful sync
+(`prs/sync_fetch.rs`, `work_items/sync.rs`). Before fetching Active PRs,
+DevDeck also checks that shared cache and skips its own API call if waypoint
+refreshed it moments earlier — see `shared_cache::is_fresh`. This shared
+schema is its own contract (raw Azure DevOps facts only, no app-specific
+fields) independent of DevDeck's own table shapes; changing DevDeck's own
+`pull_requests` / `work_items` columns does not affect it as long as the
+`shared_cache` module's own mapping in `prs/sync_fetch.rs` /
+`work_items/sync.rs` is kept in sync with what waypoint expects.
 
 `AppError` in `src-tauri/src/error.rs` is the IPC-facing error type. It
 serializes to JSON containing a `message`, and the frontend should read that via
