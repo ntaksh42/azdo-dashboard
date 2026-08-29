@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -174,8 +174,19 @@ impl WorkItemService {
             .collect::<Vec<_>>();
         fields.extend(extra_fields.iter().cloned());
         let work_items = client
-            .get_work_items_batch(&project.id, ids.clone(), fields)
+            .get_work_items_batch_with_relations(&project.id, ids.clone(), fields)
             .await?;
+
+        // Active PRs are already synced org-wide for the My Reviews/PR
+        // screens, so a linked work item's PR status is a local cache lookup
+        // rather than an extra request per row.
+        let active_pr_ids: HashSet<i64> = self
+            .db
+            .search_pull_requests(&organization.id, None, None, Some("active"))
+            .unwrap_or_default()
+            .into_iter()
+            .map(|pr| pr.pull_request_id)
+            .collect();
 
         // Preserve the query's row order (tree order for link queries).
         let mut items_by_id: HashMap<i64, WorkItem> = work_items
@@ -190,10 +201,13 @@ impl WorkItemService {
                 let depth = depths
                     .as_ref()
                     .and_then(|depth_by_id| depth_by_id.get(&work_item.id).copied());
+                let has_active_pull_request =
+                    work_item_has_active_pull_request(&work_item.relations, &active_pr_ids);
                 let mut summary =
                     summarize_work_item(&organization, &project.id, &project.name, work_item);
                 summary.extra_fields = extra;
                 summary.depth = depth;
+                summary.has_active_pull_request = has_active_pull_request;
                 summary
             })
             .collect())
@@ -363,20 +377,7 @@ impl WorkItemService {
         organization: &Organization,
         raw_relations: &[WorkItemRelation],
     ) -> Vec<WorkItemPullRequestLink> {
-        let mut pr_ids: Vec<i64> = raw_relations
-            .iter()
-            .filter(|relation| relation.rel == "ArtifactLink")
-            .filter(|relation| {
-                relation
-                    .attributes
-                    .as_ref()
-                    .and_then(|attributes| attributes.name.as_deref())
-                    .is_some_and(|name| name.eq_ignore_ascii_case("Pull Request"))
-            })
-            .filter_map(|relation| pull_request_id_from_artifact(&relation.url))
-            .collect();
-        pr_ids.sort_unstable();
-        pr_ids.dedup();
+        let pr_ids = pull_request_ids_from_relations(raw_relations);
         if pr_ids.is_empty() {
             return Vec::new();
         }

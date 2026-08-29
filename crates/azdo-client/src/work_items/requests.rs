@@ -105,6 +105,31 @@ impl AdoClient {
         ids: Vec<i64>,
         fields: Vec<String>,
     ) -> Result<Vec<WorkItem>> {
+        self.fetch_work_items_batch(project_id, ids, fields, None)
+            .await
+    }
+
+    /// Same as [`get_work_items_batch`](Self::get_work_items_batch), but also
+    /// requests each item's relations (`$expand=Relations`) so callers can
+    /// inspect `WorkItem::relations` (e.g. to find linked pull requests)
+    /// without an extra per-item request.
+    pub async fn get_work_items_batch_with_relations(
+        &self,
+        project_id: &str,
+        ids: Vec<i64>,
+        fields: Vec<String>,
+    ) -> Result<Vec<WorkItem>> {
+        self.fetch_work_items_batch(project_id, ids, fields, Some(WorkItemExpand::Relations))
+            .await
+    }
+
+    async fn fetch_work_items_batch(
+        &self,
+        project_id: &str,
+        ids: Vec<i64>,
+        fields: Vec<String>,
+        expand: Option<WorkItemExpand>,
+    ) -> Result<Vec<WorkItem>> {
         if ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -121,6 +146,7 @@ impl AdoClient {
                     &WorkItemsBatchRequest {
                         ids: chunk.to_vec(),
                         fields: fields.clone(),
+                        expand,
                     },
                 )
                 .await?;

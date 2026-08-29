@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, GitPullRequest } from 'lucide-react';
 import type { WorkItemSummary } from '@/lib/azdoCommands';
 import { focusPrimaryPreview } from '@/lib/utils';
 import {
@@ -123,6 +123,15 @@ export const WorkItemGridRow = forwardRef<
             >
               <title>{staleDays} 日間更新なし</title>
             </AlertTriangle>
+          ) : null}
+          {isTitle && item.hasActivePullRequest ? (
+            <GitPullRequest
+              role="img"
+              className="h-3.5 w-3.5 shrink-0 text-primary"
+              aria-label="関連PRあり (Active)"
+            >
+              <title>関連PRあり (Active)</title>
+            </GitPullRequest>
           ) : null}
           {isTitle ? (
             <span className="min-w-0 flex-1 truncate">

@@ -342,6 +342,10 @@ pub struct WorkItemSummary {
     pub extra_fields: Vec<WorkItemCustomField>,
     /// Tree depth for `FROM WorkItemLinks` query results; `None` for flat queries.
     pub depth: Option<u32>,
+    /// Whether an `ArtifactLink` relation points at a PR that is currently
+    /// active in the locally synced PR cache. Only populated by `run_query`
+    /// (the View grid); always `false` for cache-backed summaries.
+    pub has_active_pull_request: bool,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]

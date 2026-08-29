@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use super::super::*;
 
 /// Extracts attached files (`AttachedFile` relations) for the preview, newest
@@ -36,6 +38,38 @@ pub(crate) fn pull_request_id_from_artifact(url: &str) -> Option<i64> {
     }
     let decoded = url.replace("%2F", "/").replace("%2f", "/");
     decoded.rsplit('/').next()?.parse::<i64>().ok()
+}
+
+/// Extracts the linked pull request ids from `ArtifactLink` relations whose
+/// attribute name is "Pull Request" (the Development-section link Azure
+/// DevOps adds when a PR references a work item).
+pub(crate) fn pull_request_ids_from_relations(raw_relations: &[WorkItemRelation]) -> Vec<i64> {
+    let mut pr_ids: Vec<i64> = raw_relations
+        .iter()
+        .filter(|relation| relation.rel == "ArtifactLink")
+        .filter(|relation| {
+            relation
+                .attributes
+                .as_ref()
+                .and_then(|attributes| attributes.name.as_deref())
+                .is_some_and(|name| name.eq_ignore_ascii_case("Pull Request"))
+        })
+        .filter_map(|relation| pull_request_id_from_artifact(&relation.url))
+        .collect();
+    pr_ids.sort_unstable();
+    pr_ids.dedup();
+    pr_ids
+}
+
+/// True when any PR linked to the work item is currently active in the
+/// locally synced PR cache (`active_pr_ids`).
+pub(crate) fn work_item_has_active_pull_request(
+    raw_relations: &[WorkItemRelation],
+    active_pr_ids: &HashSet<i64>,
+) -> bool {
+    pull_request_ids_from_relations(raw_relations)
+        .iter()
+        .any(|id| active_pr_ids.contains(id))
 }
 
 /// Maps an Azure DevOps link relation to (display label, sort rank).

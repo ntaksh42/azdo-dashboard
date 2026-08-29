@@ -17,6 +17,7 @@ function makeItem(overrides: Partial<WorkItemSummary> = {}): WorkItemSummary {
     tags: null,
     extraFields: [],
     depth: null,
+    hasActivePullRequest: false,
     ...overrides,
   };
 }

@@ -311,5 +311,6 @@ fn item_to_summary(
         tags: None,
         extra_fields: Vec::new(),
         depth: None,
+        has_active_pull_request: false,
     }
 }

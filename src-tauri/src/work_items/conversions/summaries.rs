@@ -55,6 +55,7 @@ pub(crate) fn summarize_work_item(
         tags: string_field(&work_item, "System.Tags"),
         extra_fields: Vec::new(),
         depth: None,
+        has_active_pull_request: false,
     }
 }
 
@@ -189,6 +190,7 @@ pub(crate) fn cached_wi_to_summary(wi: CachedWorkItem) -> WorkItemSummary {
         tags: wi.tags,
         extra_fields: Vec::new(),
         depth: None,
+        has_active_pull_request: false,
     }
 }
 

@@ -28,6 +28,62 @@ fn pull_request_id_from_artifact_parses_git_links() {
 }
 
 #[test]
+fn pull_request_ids_from_relations_filters_artifact_links_by_attribute_name() {
+    let relations = vec![
+        WorkItemRelation {
+            rel: "ArtifactLink".to_string(),
+            url: "vstfs:///Git/PullRequestId/proj%2Frepo%2F42".to_string(),
+            attributes: Some(azdo_client::WorkItemRelationAttributes {
+                name: Some("Pull Request".to_string()),
+            }),
+        },
+        // Duplicate of the same PR id is deduplicated.
+        WorkItemRelation {
+            rel: "ArtifactLink".to_string(),
+            url: "vstfs:///Git/PullRequestId/proj%2Frepo%2F42".to_string(),
+            attributes: Some(azdo_client::WorkItemRelationAttributes {
+                name: Some("Pull Request".to_string()),
+            }),
+        },
+        // Non-PR artifact links (e.g. a linked branch) are ignored.
+        WorkItemRelation {
+            rel: "ArtifactLink".to_string(),
+            url: "vstfs:///Git/Ref/proj%2Frepo%2Fmain".to_string(),
+            attributes: Some(azdo_client::WorkItemRelationAttributes {
+                name: Some("Branch".to_string()),
+            }),
+        },
+        // Non-ArtifactLink relations are ignored regardless of attributes.
+        WorkItemRelation {
+            rel: "System.LinkTypes.Related".to_string(),
+            url: "https://dev.azure.com/org/_apis/wit/workItems/5".to_string(),
+            attributes: None,
+        },
+    ];
+    assert_eq!(pull_request_ids_from_relations(&relations), vec![42]);
+}
+
+#[test]
+fn work_item_has_active_pull_request_checks_membership_in_active_set() {
+    let relations = vec![WorkItemRelation {
+        rel: "ArtifactLink".to_string(),
+        url: "vstfs:///Git/PullRequestId/proj%2Frepo%2F42".to_string(),
+        attributes: Some(azdo_client::WorkItemRelationAttributes {
+            name: Some("Pull Request".to_string()),
+        }),
+    }];
+
+    let active: std::collections::HashSet<i64> = [42].into_iter().collect();
+    assert!(work_item_has_active_pull_request(&relations, &active));
+
+    // A PR that is linked but not in the active set (e.g. completed) doesn't count.
+    let completed: std::collections::HashSet<i64> = [99].into_iter().collect();
+    assert!(!work_item_has_active_pull_request(&relations, &completed));
+
+    assert!(!work_item_has_active_pull_request(&[], &active));
+}
+
+#[test]
 fn extract_attachments_keeps_only_attached_files() {
     let relations = vec![
         WorkItemRelation {
@@ -88,6 +144,7 @@ fn summarize_maps_identity_object() {
             id: 123,
             fields,
             links: None,
+            relations: Vec::new(),
         },
     );
 
@@ -134,6 +191,7 @@ fn summarize_preview_maps_rich_fields() {
             id: 456,
             fields,
             links: None,
+            relations: Vec::new(),
         },
         vec![],
     );
@@ -176,6 +234,7 @@ fn summarize_preview_uses_repro_steps_as_description_fallback() {
             id: 457,
             fields,
             links: None,
+            relations: Vec::new(),
         },
         vec![],
     );

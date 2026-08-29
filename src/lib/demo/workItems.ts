@@ -23,13 +23,18 @@ import {
 
 // Demo seed rows omit the derived `extraFields`/`depth` and treat `tags` as
 // optional so most fixtures can skip it; `withEmptyExtraFields` fills the gaps.
-type WorkItemSeed = Omit<WorkItemSummary, "extraFields" | "depth" | "tags"> & {
+type WorkItemSeed = Omit<
+  WorkItemSummary,
+  "extraFields" | "depth" | "tags" | "hasActivePullRequest"
+> & {
   tags?: string | null;
+  hasActivePullRequest?: boolean;
 };
 
 export function withEmptyExtraFields(items: WorkItemSeed[]): WorkItemSummary[] {
   return items.map((item) => ({
     tags: null,
+    hasActivePullRequest: false,
     ...item,
     extraFields: [],
     depth: null,
@@ -64,6 +69,7 @@ export function demoCreateWorkItem(input?: CreateWorkItemInput): WorkItemSummary
     tags: input?.tags?.length ? input.tags.join("; ") : null,
     extraFields: [],
     depth: null,
+    hasActivePullRequest: false,
   };
   demoCreatedWorkItems.unshift(created);
   return created;
@@ -82,6 +88,7 @@ export function demoWorkItems(input?: SearchWorkItemsInput): WorkItemSummary[] {
       assignedTo: "Demo User",
       changedDate: "2026-05-27T08:00:00Z",
       webUrl: "https://dev.azure.com/contoso/Platform/_workitems/edit/123",
+      hasActivePullRequest: true,
     },
     {
       organizationId: "contoso",
@@ -144,6 +151,7 @@ export function demoWorkItems(input?: SearchWorkItemsInput): WorkItemSummary[] {
       assignedTo: "Carol Wang",
       changedDate: "2026-05-25T16:00:00Z",
       webUrl: "https://dev.azure.com/contoso/Mobile/_workitems/edit/175",
+      hasActivePullRequest: true,
     },
     {
       organizationId: "contoso",

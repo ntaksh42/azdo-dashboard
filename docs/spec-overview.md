@@ -366,6 +366,16 @@ Enter/Space/↓ で開き、↑↓ で項目移動、Enter/Space でトグル、
 
 ### Work Item Views
 
+結果グリッドは、作業項目に `ArtifactLink` (Pull Request) の関連付けがあり、
+かつそのPRがローカル同期済みのActive PRキャッシュ (`pull_requests` テーブル、
+プロジェクト全体を対象) に含まれる場合、タイトルセルに関連PRバッジ
+(git-pull-request アイコン、ツールチップ「関連PRあり (Active)」) を表示する。
+これは `run_work_item_query` 実行時にバッチ取得へ `$expand=Relations` を付与して
+関連情報を取得し、Active PRキャッシュと突き合わせるだけで判定するため追加の
+API呼び出しは発生しない。この判定はビュー実行結果 (`WorkItemSummary.hasActivePullRequest`)
+にのみ適用され、My Work Items など同期キャッシュ経由の一覧には反映されない
+(常に `false`)。Completed/Abandoned のみのPRは対象外。
+
 ビュー一覧では `↑ ↓ ← →` (グリッド状に移動) / `Home` / `End` で選択、`Shift+←→↑↓` で並べ替え、
 `Delete` で削除、`N` 追加 / `E` 編集 / `R` 全ビュー再実行。`Ctrl+B` は一覧の折りたたみトグルで、
 ビュー一覧と結果グリッドのどちらにフォーカスがあっても効く。折りたたむとリストが DOM から

@@ -248,6 +248,45 @@ async fn get_work_items_batch_splits_large_id_lists() {
 }
 
 #[tokio::test]
+async fn get_work_items_batch_with_relations_requests_expand_and_parses_relations() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/project-1/_apis/wit/workitemsbatch"))
+        .and(body_json(serde_json::json!({
+            "ids": [10],
+            "fields": ["System.Title"],
+            "$expand": "relations"
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "count": 1,
+            "value": [{
+                "id": 10,
+                "fields": { "System.Title": "Fix bug" },
+                "relations": [{
+                    "rel": "ArtifactLink",
+                    "url": "vstfs:///Git/PullRequestId/proj%2Frepo%2F42",
+                    "attributes": { "name": "Pull Request" }
+                }]
+            }]
+        })))
+        .mount(&server)
+        .await;
+
+    let items = test_client(&server)
+        .await
+        .get_work_items_batch_with_relations(
+            "project-1",
+            vec![10],
+            vec!["System.Title".to_string()],
+        )
+        .await
+        .unwrap();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].relations.len(), 1);
+    assert_eq!(items[0].relations[0].rel, "ArtifactLink");
+}
+
+#[tokio::test]
 async fn add_work_item_comment_posts_markdown() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))

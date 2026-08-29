@@ -20,6 +20,7 @@ export const workItemSummarySchema = z.object({
   tags: z.string().nullable().default(null),
   extraFields: z.array(workItemSummaryExtraFieldSchema).default([]),
   depth: z.number().nullable().default(null),
+  hasActivePullRequest: z.boolean().default(false),
 });
 
 export const workItemSummariesSchema = z.array(workItemSummarySchema);

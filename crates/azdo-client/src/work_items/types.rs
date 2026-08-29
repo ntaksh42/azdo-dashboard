@@ -42,6 +42,16 @@ pub struct WorkItemLink {
 pub struct WorkItemsBatchRequest {
     pub ids: Vec<i64>,
     pub fields: Vec<String>,
+    #[serde(rename = "$expand", skip_serializing_if = "Option::is_none")]
+    pub expand: Option<WorkItemExpand>,
+}
+
+/// The `$expand` value for a work items batch request. Only the variants this
+/// crate uses are modeled; Azure DevOps also defines `Fields`, `Links`, `All`.
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum WorkItemExpand {
+    Relations,
 }
 
 #[derive(Debug, Deserialize)]
@@ -52,6 +62,8 @@ pub struct WorkItem {
     pub fields: HashMap<String, Value>,
     #[serde(rename = "_links")]
     pub links: Option<WorkItemLinks>,
+    #[serde(default)]
+    pub relations: Vec<WorkItemRelation>,
 }
 
 #[derive(Debug, Deserialize)]
