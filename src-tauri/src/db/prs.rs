@@ -15,6 +15,12 @@ pub struct CachedPr {
     pub title: String,
     pub status: String,
     pub created_by: Option<String>,
+    /// Author's identity GUID (`createdBy.id` from the PR API), distinct from
+    /// the display-name `created_by` above. Needed to answer "did I create
+    /// this PR" by exact identity match rather than a display-name guess;
+    /// waypoint's Quick Launch also reads this column directly to compute the
+    /// same thing against its own authenticated user id.
+    pub created_by_id: Option<String>,
     pub creation_date: String,
     pub source_ref_name: String,
     pub target_ref_name: String,
@@ -128,9 +134,9 @@ fn upsert_pull_requests(conn: &Connection, prs: &[CachedPr]) -> Result<()> {
         r#"
         INSERT INTO pull_requests(
             org_id, project_id, project_name, repository_id, repository_name,
-            pull_request_id, title, status, created_by, creation_date,
+            pull_request_id, title, status, created_by, created_by_id, creation_date,
             source_ref_name, target_ref_name, web_url, is_draft
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
         ON CONFLICT(org_id, repository_id, pull_request_id) DO UPDATE SET
             project_id = excluded.project_id,
             project_name = excluded.project_name,
@@ -138,6 +144,7 @@ fn upsert_pull_requests(conn: &Connection, prs: &[CachedPr]) -> Result<()> {
             title = excluded.title,
             status = excluded.status,
             created_by = excluded.created_by,
+            created_by_id = excluded.created_by_id,
             creation_date = excluded.creation_date,
             source_ref_name = excluded.source_ref_name,
             target_ref_name = excluded.target_ref_name,
@@ -156,6 +163,7 @@ fn upsert_pull_requests(conn: &Connection, prs: &[CachedPr]) -> Result<()> {
             pr.title,
             pr.status,
             pr.created_by,
+            pr.created_by_id,
             pr.creation_date,
             pr.source_ref_name,
             pr.target_ref_name,
@@ -176,7 +184,7 @@ fn search_pull_requests(
     let mut stmt = conn.prepare(
         r#"
         SELECT org_id, project_id, project_name, repository_id, repository_name,
-               pull_request_id, title, status, created_by, creation_date,
+               pull_request_id, title, status, created_by, created_by_id, creation_date,
                source_ref_name, target_ref_name, web_url, is_draft
         FROM pull_requests
         WHERE org_id = ?1
@@ -289,11 +297,12 @@ fn map_cached_pr(row: &rusqlite::Row<'_>) -> rusqlite::Result<CachedPr> {
         title: row.get(6)?,
         status: row.get(7)?,
         created_by: row.get(8)?,
-        creation_date: row.get(9)?,
-        source_ref_name: row.get(10)?,
-        target_ref_name: row.get(11)?,
-        web_url: row.get(12)?,
-        is_draft: row.get(13)?,
+        created_by_id: row.get(9)?,
+        creation_date: row.get(10)?,
+        source_ref_name: row.get(11)?,
+        target_ref_name: row.get(12)?,
+        web_url: row.get(13)?,
+        is_draft: row.get(14)?,
     })
 }
 

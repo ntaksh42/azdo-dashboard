@@ -67,6 +67,7 @@ pub(crate) async fn fetch_active_prs_for_project(
                 encode_path_segment(&repo.name),
                 pr.pull_request_id
             );
+            let created_by_id = pr.created_by.as_ref().and_then(|u| u.id.clone());
             Some(CachedPr {
                 org_id: org.id.clone(),
                 project_id: project.id.clone(),
@@ -77,6 +78,7 @@ pub(crate) async fn fetch_active_prs_for_project(
                 title: pr.title,
                 status: pr.status,
                 created_by: pr.created_by.and_then(|u| u.display_name.or(u.unique_name)),
+                created_by_id,
                 creation_date: pr.creation_date.to_rfc3339(),
                 source_ref_name: short_ref(&pr.source_ref_name),
                 target_ref_name: short_ref(&pr.target_ref_name),

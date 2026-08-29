@@ -211,3 +211,53 @@ fn migrate_v4_db_upgrades_to_v5() {
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].assigned_to.as_deref(), Some("Alice"));
 }
+
+#[test]
+fn migrate_v19_db_upgrades_to_v20_adds_pr_author_id_column() {
+    let tf = NamedTempFile::new().unwrap();
+    let db = AppDatabase::new(tf.path().to_path_buf());
+    {
+        let conn = db.open().unwrap();
+        conn.pragma_update_and_check(None, "journal_mode", "WAL", |_| Ok(()))
+            .unwrap();
+        conn.execute_batch(
+            r#"
+            CREATE TABLE app_settings(key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL);
+            CREATE TABLE organizations(id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE,
+                display_name TEXT, base_url TEXT NOT NULL, auth_provider TEXT NOT NULL,
+                credential_key TEXT NOT NULL, authenticated_user_id TEXT,
+                authenticated_user_display_name TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+            CREATE TABLE pull_requests(
+                org_id TEXT NOT NULL, project_id TEXT NOT NULL, project_name TEXT NOT NULL,
+                repository_id TEXT NOT NULL, repository_name TEXT NOT NULL,
+                pull_request_id INTEGER NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL,
+                created_by TEXT, creation_date TEXT NOT NULL, source_ref_name TEXT NOT NULL,
+                target_ref_name TEXT NOT NULL, web_url TEXT, is_draft INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (org_id, repository_id, pull_request_id));
+            INSERT INTO organizations VALUES('org1','org1',NULL,'https://dev.azure.com/org1','pat','key',NULL,NULL,'2024-01-01','2024-01-01');
+            INSERT INTO pull_requests(org_id, project_id, project_name, repository_id, repository_name,
+                pull_request_id, title, status, created_by, creation_date, source_ref_name, target_ref_name, web_url, is_draft)
+                VALUES('org1', 'p1', 'P1', 'repo1', 'Repo1', 42, 'Old PR', 'active', 'Alice',
+                    '2024-01-01T00:00:00Z', 'feature', 'main', NULL, 0);
+            PRAGMA user_version = 19;
+            "#,
+        )
+        .unwrap();
+    }
+    db.initialize().unwrap();
+
+    let version: i64 = db
+        .open()
+        .unwrap()
+        .query_row("PRAGMA user_version", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(version, SCHEMA_VERSION);
+
+    // Pre-existing row survived and created_by_id defaulted to NULL, since it
+    // did not exist before this migration (waypoint falls back to is_mine =
+    // false in that case rather than erroring).
+    let results = db.search_pull_requests("org1", None, None, None).unwrap();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].created_by.as_deref(), Some("Alice"));
+    assert_eq!(results[0].created_by_id, None);
+}

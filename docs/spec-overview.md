@@ -201,11 +201,20 @@ Notifications (未読通知件数、99 超は「99+」)。0/未取得時は非�
 
 - アクセス: `AppDatabase` がパスラッパとして呼び出しごとに接続を開く (`rusqlite`)。
 - 移行: `src-tauri/src/db.rs` の `migrate()` が `PRAGMA user_version` を使用。
-  **現行スキーマバージョン: 19** (v19 で通知履歴用の `notifications` テーブルを追加)。
+  **現行スキーマバージョン: 20** (v19 で通知履歴用の `notifications` テーブルを追加、
+  v20 で `pull_requests.created_by_id` を追加)。
 - 主なテーブル: 組織、アクティブ/レビュー対象 PR、作業項目、My Work Items スナップショット
   (最大 200)、コミット、コミット↔PR 関連、各種 FTS インデックス、同期状態、スヌーズ、
   PR コメント既読、メンション/割当先履歴、通知履歴 (`notifications`)、アプリ設定。
 - ジャーナル: WAL、`synchronous=NORMAL`、外部キー ON。
+- **外部消費者**: 同じ端末で動く別アプリ waypoint (`C:\Users\<user>\source\repos\waypoint`)
+  が、この SQLite ファイル (`%APPDATA%\com.azdodeck.app\azdodeck.sqlite3`) を読み取り専用で
+  直接参照し、Quick Launch の Active PR / Work Item 候補を表示する (waypoint 自身は Azure
+  DevOps を二重にポーリングしない)。参照されるのは `pull_requests` (`created_by_id` は
+  waypoint の is_mine 判定に必須)、`work_items`、`review_pull_requests`、`organizations`
+  (`authenticated_user_id`) の各テーブル。これらのテーブル・列を変更する際は waypoint 側の
+  クエリが壊れないよう互換性を意識すること (waypoint はスキーマ不一致時に空リストへ
+  フォールバックする設計だが、無言でデータが消えるだけなので変更時は注意する)。
 
 ### 同期ループ (`sync.rs`)
 

@@ -84,6 +84,7 @@ fn pull_requests_search() {
         title: "Add feature X".to_string(),
         status: "active".to_string(),
         created_by: Some("Alice".to_string()),
+        created_by_id: None,
         creation_date: "2024-01-01T00:00:00Z".to_string(),
         source_ref_name: "refs/heads/feature".to_string(),
         target_ref_name: "refs/heads/main".to_string(),

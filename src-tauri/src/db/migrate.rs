@@ -538,5 +538,19 @@ pub fn migrate(conn: &Connection) -> Result<()> {
             "#,
         )?;
     }
+    if current < 20 {
+        // waypoint (a separate app) reads this table's active PRs directly out
+        // of this SQLite file to avoid polling Azure DevOps a second time; it
+        // needs the author's identity GUID (not just the display name already
+        // stored in `created_by`) to compute "authored by me" without another
+        // API call. The table-exists guard keeps partial historical databases
+        // from tripping over a not-yet-created pull_requests table.
+        if table_exists(conn, "pull_requests")?
+            && !table_column_exists(conn, "pull_requests", "created_by_id")?
+        {
+            conn.execute_batch("ALTER TABLE pull_requests ADD COLUMN created_by_id TEXT;")?;
+        }
+        conn.execute_batch("PRAGMA user_version = 20;")?;
+    }
     Ok(())
 }

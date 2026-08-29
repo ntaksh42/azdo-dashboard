@@ -125,9 +125,16 @@ XService {
 `settings.rs` only needs the database. `AppDatabase` is a cloneable path wrapper that opens SQLite connections per call
 via `rusqlite`. Schema migrations live in `src-tauri/src/db.rs:migrate()` and
 use `PRAGMA user_version`; the current schema version is the `SCHEMA_VERSION`
-constant in `src-tauri/src/db/mod.rs` (currently `19`). `migrate()` applies each
+constant in `src-tauri/src/db/mod.rs` (currently `20`). `migrate()` applies each
 `if current < N` step in order and must stay repeatable; add a new numbered
 step rather than editing an existing one.
+
+The SQLite file itself (`azdodeck.sqlite3`) is also read directly, read-only,
+by a separate app (waypoint) for its Quick Launch Azure DevOps candidates, so
+it doubles as a cross-app data contract. Changing or removing columns on
+`pull_requests` (including `created_by_id`), `work_items`,
+`review_pull_requests`, or `organizations` can silently break that consumer;
+check it when touching those tables.
 
 `AppError` in `src-tauri/src/error.rs` is the IPC-facing error type. It
 serializes to JSON containing a `message`, and the frontend should read that via

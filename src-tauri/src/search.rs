@@ -252,6 +252,7 @@ mod tests {
                 title: "Add retry backoff".to_string(),
                 status: "active".to_string(),
                 created_by: Some("Alice".to_string()),
+                created_by_id: None,
                 creation_date: "2026-06-03T00:00:00Z".to_string(),
                 source_ref_name: "refs/heads/retry-backoff".to_string(),
                 target_ref_name: "refs/heads/main".to_string(),
