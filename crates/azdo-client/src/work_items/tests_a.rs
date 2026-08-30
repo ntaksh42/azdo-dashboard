@@ -249,19 +249,36 @@ async fn get_work_items_batch_splits_large_id_lists() {
 
 #[tokio::test]
 async fn get_work_items_batch_with_relations_requests_expand_and_parses_relations() {
+    // Azure DevOps rejects a workitemsbatch request that sets both `fields`
+    // and `$expand` at once, so this must be two separate requests: one for
+    // fields, one for relations (with `fields` entirely absent, not just
+    // empty).
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/project-1/_apis/wit/workitemsbatch"))
         .and(body_json(serde_json::json!({
             "ids": [10],
-            "fields": ["System.Title"],
+            "fields": ["System.Title"]
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "count": 1,
+            "value": [{
+                "id": 10,
+                "fields": { "System.Title": "Fix bug" }
+            }]
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/project-1/_apis/wit/workitemsbatch"))
+        .and(body_json(serde_json::json!({
+            "ids": [10],
             "$expand": "relations"
         })))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "count": 1,
             "value": [{
                 "id": 10,
-                "fields": { "System.Title": "Fix bug" },
                 "relations": [{
                     "rel": "ArtifactLink",
                     "url": "vstfs:///Git/PullRequestId/proj%2Frepo%2F42",
@@ -282,6 +299,7 @@ async fn get_work_items_batch_with_relations_requests_expand_and_parses_relation
         .await
         .unwrap();
     assert_eq!(items.len(), 1);
+    assert_eq!(items[0].fields["System.Title"], "Fix bug");
     assert_eq!(items[0].relations.len(), 1);
     assert_eq!(items[0].relations[0].rel, "ArtifactLink");
 }

@@ -37,11 +37,16 @@ pub struct WorkItemLink {
     pub target_id: i64,
 }
 
+/// Azure DevOps rejects a workitemsbatch request that sets both `fields` and
+/// `$expand` ("The expand parameter can not be used with the fields
+/// parameter"), so `fields` must be omitted entirely (not just empty) when
+/// `expand` is set.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkItemsBatchRequest {
     pub ids: Vec<i64>,
-    pub fields: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fields: Option<Vec<String>>,
     #[serde(rename = "$expand", skip_serializing_if = "Option::is_none")]
     pub expand: Option<WorkItemExpand>,
 }

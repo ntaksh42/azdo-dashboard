@@ -105,29 +105,46 @@ impl AdoClient {
         ids: Vec<i64>,
         fields: Vec<String>,
     ) -> Result<Vec<WorkItem>> {
-        self.fetch_work_items_batch(project_id, ids, fields, None)
+        self.fetch_work_items_batch(project_id, ids, Some(fields), None)
             .await
     }
 
     /// Same as [`get_work_items_batch`](Self::get_work_items_batch), but also
-    /// requests each item's relations (`$expand=Relations`) so callers can
-    /// inspect `WorkItem::relations` (e.g. to find linked pull requests)
+    /// populates each item's relations (e.g. to find linked pull requests)
     /// without an extra per-item request.
+    ///
+    /// Azure DevOps rejects a workitemsbatch request that sets both `fields`
+    /// and `$expand` at once, so this issues two batch requests — one for the
+    /// requested fields, one with `$expand=Relations` and no `fields` — and
+    /// merges the relations into the field-carrying items by id.
     pub async fn get_work_items_batch_with_relations(
         &self,
         project_id: &str,
         ids: Vec<i64>,
         fields: Vec<String>,
     ) -> Result<Vec<WorkItem>> {
-        self.fetch_work_items_batch(project_id, ids, fields, Some(WorkItemExpand::Relations))
-            .await
+        let mut items = self
+            .fetch_work_items_batch(project_id, ids.clone(), Some(fields), None)
+            .await?;
+        let mut relations_by_id: std::collections::HashMap<i64, Vec<WorkItemRelation>> = self
+            .fetch_work_items_batch(project_id, ids, None, Some(WorkItemExpand::Relations))
+            .await?
+            .into_iter()
+            .map(|item| (item.id, item.relations))
+            .collect();
+        for item in &mut items {
+            if let Some(relations) = relations_by_id.remove(&item.id) {
+                item.relations = relations;
+            }
+        }
+        Ok(items)
     }
 
     async fn fetch_work_items_batch(
         &self,
         project_id: &str,
         ids: Vec<i64>,
-        fields: Vec<String>,
+        fields: Option<Vec<String>>,
         expand: Option<WorkItemExpand>,
     ) -> Result<Vec<WorkItem>> {
         if ids.is_empty() {
