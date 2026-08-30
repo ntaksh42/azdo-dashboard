@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       force_release:
-        description: 'Create a release even when master has no commits after the latest v* tag'
+        description: 'Create a release even when main has no commits after the latest v* tag'
         required: false
         default: false
         type: boolean
@@ -66,8 +66,8 @@ jobs:
             exit 0
           }
 
-          git checkout master
-          git pull --ff-only origin master
+          git checkout main
+          git pull --ff-only origin main
 
           $latestTag = git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | Select-Object -First 1
           if ($latestTag) {
@@ -80,7 +80,7 @@ jobs:
             "should_release=false" >> $env:GITHUB_OUTPUT
             "create_tag=false" >> $env:GITHUB_OUTPUT
             "commits_since_previous=0" >> $env:GITHUB_OUTPUT
-            Write-Host "master has not advanced since $latestTag; skipping release."
+            Write-Host "main has not advanced since $latestTag; skipping release."
             exit 0
           }
 
@@ -99,7 +99,7 @@ jobs:
           # absent), unlike `git rev-parse --verify --quiet` which exits 1 and
           # would leave a non-zero $LASTEXITCODE on the normal new-version path.
           if (git tag --list "$tag") {
-            throw "Tag $tag already exists, but master has unreleased commits. Create the next version tag manually or delete the stale tag."
+            throw "Tag $tag already exists, but main has unreleased commits. Create the next version tag manually or delete the stale tag."
           }
 
           "should_release=true" >> $env:GITHUB_OUTPUT
@@ -201,7 +201,7 @@ jobs:
             - `*.exe`: NSIS installer, recommended for most users.
             - `*.msi`: MSI installer for managed Windows environments.
 
-            This release was built from `master` after ${{ steps.release.outputs.commits_since_previous }} commit(s) since the previous release tag.
+            This release was built from `main` after ${{ steps.release.outputs.commits_since_previous }} commit(s) since the previous release tag.
 
             See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ steps.release.outputs.tag }}/CHANGELOG.md) for what changed in this release.
 

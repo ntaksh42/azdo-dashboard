@@ -114,14 +114,14 @@ function Wait-ForReleaseRun([string] $Tag) {
 Run "git" @("fetch", "origin", "--tags")
 
 $branch = (git branch --show-current).Trim()
-if ($branch -ne "master") {
-  throw "Releases must be cut from master. Current branch: $branch"
+if ($branch -ne "main") {
+  throw "Releases must be cut from main. Current branch: $branch"
 }
 
-$local = (git rev-parse master).Trim()
-$remote = (git rev-parse origin/master).Trim()
+$local = (git rev-parse main).Trim()
+$remote = (git rev-parse origin/main).Trim()
 if ($local -ne $remote) {
-  throw "Local master is not equal to origin/master. Push or pull before releasing."
+  throw "Local main is not equal to origin/main. Push or pull before releasing."
 }
 
 $dirtyBefore = git status --porcelain
@@ -161,7 +161,7 @@ Run "git" @("commit", "-m", "Release $Version")
 Run "git" @("tag", "-a", $tag, "-m", "Release $tag")
 
 if (-not $NoPush) {
-  Run "git" @("push", "origin", "master")
+  Run "git" @("push", "origin", "main")
   Run "git" @("push", "origin", $tag)
 }
 

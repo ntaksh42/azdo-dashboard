@@ -238,7 +238,7 @@ statuses", unless the service and cache layer are updated at the same time.
 ## Working Safely
 
 - Do all work on a dedicated git worktree, not directly on the main checkout.
-  Create a worktree for the task, make changes there, and keep `master` and the
+  Create a worktree for the task, make changes there, and keep `main` and the
   primary working tree clean.
 - Keep browser demo mode healthy when touching command code.
 - Keep the standalone `azdo-client` crate independent from the Tauri app.
