@@ -37,15 +37,44 @@ pub use pull_requests::{
 };
 pub use work_items::{upsert_work_items, write_work_items, SharedWorkItem};
 
+#[cfg(not(test))]
 const DIR_NAME: &str = "AzDoSharedCache";
+#[cfg(not(test))]
 const FILE_NAME: &str = "cache.db";
 
 /// Identifies who most recently refreshed a scope, for debugging/visibility
 /// only (never used in any freshness decision).
 pub const SYNCED_BY: &str = "devdeck";
 
+#[cfg(not(test))]
 pub fn path() -> Option<PathBuf> {
     std::env::var_os("APPDATA").map(|appdata| PathBuf::from(appdata).join(DIR_NAME).join(FILE_NAME))
+}
+
+/// Integration tests exercise real sync code paths (`do_sync_prs`,
+/// `do_sync_work_items`) that write through `shared_cache::open()`. Without
+/// this override, every `cargo test` run would write fixture data into the
+/// real machine-wide `%APPDATA%\AzDoSharedCache\cache.db` that waypoint also
+/// reads. Each test function runs on its own freshly spawned thread under
+/// the default test harness, so a thread-local, once-per-thread temp path
+/// keeps every test's shared cache isolated from both the real file and
+/// from other tests.
+#[cfg(test)]
+pub fn path() -> Option<PathBuf> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    thread_local! {
+        static PATH: PathBuf = {
+            static COUNTER: AtomicU64 = AtomicU64::new(0);
+            let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+            std::env::temp_dir().join(format!(
+                "devdeck-shared-cache-test-{}-{}.db",
+                std::process::id(),
+                id
+            ))
+        };
+    }
+    Some(PATH.with(PathBuf::clone))
 }
 
 pub fn open() -> Result<Connection> {
@@ -188,6 +217,13 @@ mod tests {
         )
         .unwrap();
         conn
+    }
+
+    #[test]
+    fn path_stays_within_the_os_temp_directory_and_is_stable_per_thread() {
+        let first = path().unwrap();
+        assert!(first.starts_with(std::env::temp_dir()));
+        assert_eq!(first, path().unwrap());
     }
 
     #[test]
