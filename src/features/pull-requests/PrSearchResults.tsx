@@ -28,7 +28,7 @@ import {
 } from '@/lib/columnFilters';
 import { PrReviewPanel } from './PrReviewPanel';
 import { useAdaptivePreviewWidth } from '@/lib/useAdaptivePreviewWidth';
-import { PrSearchRow } from './PrSearchRow';
+import { MemoPrSearchRow } from './MemoPrSearchRow';
 import {
   type PrSearchFilterableColumn,
   PR_SEARCH_KEYS,
@@ -408,9 +408,9 @@ export function PullRequestResults({
               {virtualRows.map((pr, offset) => {
                 const index = firstVirtualRow + offset;
                 return (
-                  <PrSearchRow
+                  <MemoPrSearchRow
                     key={`${pr.repositoryId}:${pr.pullRequestId}`}
-                    ref={(el) => { rowRefs.current[index] = el; }}
+                    index={index}
                     pr={pr}
                     selected={index === selectedIndex}
                     inMultiSelection={selection.selectedKeys.has(
@@ -418,9 +418,9 @@ export function PullRequestResults({
                     )}
                     columnTemplate={columnTemplate}
                     visibleColumns={visibleColumns}
-                    onSelect={(modifiers) =>
-                      selection.handleRowClick(index, modifiers, setSelectedIndex)
-                    }
+                    rowRefs={rowRefs}
+                    handleRowClick={selection.handleRowClick}
+                    setSelectedIndex={setSelectedIndex}
                   />
                 );
               })}
