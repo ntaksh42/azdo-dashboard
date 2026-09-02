@@ -1,5 +1,6 @@
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import type { WorkItemSummary } from '@/lib/azdoCommands';
+import { useLatestRef } from '@/lib/useLatestRef';
 
 // Row selection for the work items grid. Unlike the other grids (which use
 // `useRangeSelection`), selection here *is* the checkbox state the bulk actions
@@ -29,8 +30,7 @@ export function useWiRowSelection({
   setCheckedIds,
   setLastCheckedIndex,
 }: WiSelectionDeps) {
-  const depsRef = useRef({ displayed, selectedIndex, lastCheckedIndex });
-  depsRef.current = { displayed, selectedIndex, lastCheckedIndex };
+  const depsRef = useLatestRef({ displayed, selectedIndex, lastCheckedIndex });
 
   // Checkbox click. Shift extends from the last checkbox the user touched.
   const handleCheckboxChange = useCallback((index: number, checked: boolean, shiftKey: boolean) => {

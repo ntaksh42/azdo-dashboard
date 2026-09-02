@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useLatestRef } from "./useLatestRef";
 
 // Shift/Ctrl row multi-selection shared by the grids that only track a single
 // roving `selectedIndex` (My Pull Requests, PR search, Commits). Rows are
@@ -37,8 +38,7 @@ export function useRangeSelection<T>({
   // below would make extendTo/toggleAt/clear/handleRowClick unstable across
   // nearly every render — defeating any row-level memoization built on top of
   // this hook. Read them from a ref, refreshed each render, instead.
-  const depsRef = useRef({ rows, selectedIndex, keyOf, anchorKey });
-  depsRef.current = { rows, selectedIndex, keyOf, anchorKey };
+  const depsRef = useLatestRef({ rows, selectedIndex, keyOf, anchorKey });
 
   // Drop keys whose rows disappeared (filter change, sync) so the status bar
   // and copy action never report rows the user cannot see.

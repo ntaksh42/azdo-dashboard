@@ -3,6 +3,7 @@ import { useQueries } from '@tanstack/react-query';
 import { listPullRequestChanges, prLocator, type ReviewPullRequestSummary } from '@/lib/azdoCommands';
 import { recordRecentPullRequest } from '@/lib/recentItems';
 import { useGridFocusRestoration } from '@/lib/useGridFocusRestoration';
+import { useLatestRef } from '@/lib/useLatestRef';
 import { detectFileOverlaps } from '@/lib/prOverlap';
 import { acknowledgeReturn } from './reviewReturnTracking';
 import { reviewTriageKey } from './myReviewsHelpers';
@@ -51,8 +52,7 @@ export function useMyReviewsSelectionState({
   // selection change. `sortedPrs`/`visibleSortedIndexes`/`selectedIndex`/
   // `selectionAnchor` all change often, so they are read through a ref
   // (refreshed every render) instead of being captured directly.
-  const depsRef = useRef({ sortedPrs, visibleSortedIndexes, selectedIndex, selectionAnchor });
-  depsRef.current = { sortedPrs, visibleSortedIndexes, selectedIndex, selectionAnchor };
+  const depsRef = useLatestRef({ sortedPrs, visibleSortedIndexes, selectedIndex, selectionAnchor });
 
   // ── Navigation helpers ─────────────────────────────────────────────────────
   function focusRow(index: number) {
