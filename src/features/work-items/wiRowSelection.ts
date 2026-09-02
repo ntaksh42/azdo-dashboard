@@ -1,3 +1,4 @@
+import { useCallback, useRef } from 'react';
 import type { WorkItemSummary } from '@/lib/azdoCommands';
 
 // Row selection for the work items grid. Unlike the other grids (which use
@@ -16,15 +17,24 @@ export function workItemKey(item: WorkItemSummary): string {
   return `${item.organizationId}:${item.projectId}:${item.id}`;
 }
 
-export function createWiRowSelection({
+// The grid rows are memoized, so these handlers must keep the same identity
+// across renders or every row re-renders whenever the selection or the row list
+// changes. The values they read (`displayed`, `selectedIndex`,
+// `lastCheckedIndex`) do change every render, so they are read through a ref
+// that is refreshed on each render instead of being captured in the closures.
+export function useWiRowSelection({
   displayed,
   selectedIndex,
   lastCheckedIndex,
   setCheckedIds,
   setLastCheckedIndex,
 }: WiSelectionDeps) {
+  const depsRef = useRef({ displayed, selectedIndex, lastCheckedIndex });
+  depsRef.current = { displayed, selectedIndex, lastCheckedIndex };
+
   // Checkbox click. Shift extends from the last checkbox the user touched.
-  function handleCheckboxChange(index: number, checked: boolean, shiftKey: boolean) {
+  const handleCheckboxChange = useCallback((index: number, checked: boolean, shiftKey: boolean) => {
+    const { displayed, lastCheckedIndex } = depsRef.current;
     const item = displayed[index];
     if (!item) return;
     const key = workItemKey(item);
@@ -45,12 +55,13 @@ export function createWiRowSelection({
       return next;
     });
     setLastCheckedIndex(index);
-  }
+  }, [setCheckedIds, setLastCheckedIndex]);
 
   // Shift+click / Shift+Arrow range select. Callers pass `anchorIndex`
   // explicitly when the focused row has already moved to the clicked row, so
   // the first Shift+click still selects a range rather than a single row.
-  function selectRangeTo(index: number, anchorIndex?: number) {
+  const selectRangeTo = useCallback((index: number, anchorIndex?: number) => {
+    const { displayed, selectedIndex, lastCheckedIndex } = depsRef.current;
     const anchor = anchorIndex ?? lastCheckedIndex ?? selectedIndex;
     const from = Math.min(anchor, index);
     const to = Math.max(anchor, index);
@@ -63,11 +74,12 @@ export function createWiRowSelection({
       return next;
     });
     setLastCheckedIndex(anchor);
-  }
+  }, [setCheckedIds, setLastCheckedIndex]);
 
   // Ctrl+click adds or removes a single row, seeding from the focused row so
   // the first Ctrl+click grows the selection instead of replacing it.
-  function toggleSelectionAt(index: number, focusedIndex: number) {
+  const toggleSelectionAt = useCallback((index: number, focusedIndex: number) => {
+    const { displayed } = depsRef.current;
     const item = displayed[index];
     if (!item) return;
     const key = workItemKey(item);
@@ -82,12 +94,12 @@ export function createWiRowSelection({
       return next;
     });
     setLastCheckedIndex(index);
-  }
+  }, [setCheckedIds, setLastCheckedIndex]);
 
-  function clearCheckedIds() {
+  const clearCheckedIds = useCallback(() => {
     setCheckedIds(new Set());
     setLastCheckedIndex(null);
-  }
+  }, [setCheckedIds, setLastCheckedIndex]);
 
   return { handleCheckboxChange, selectRangeTo, toggleSelectionAt, clearCheckedIds };
 }

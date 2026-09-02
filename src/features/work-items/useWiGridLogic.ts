@@ -27,7 +27,7 @@ import { useRowColorRules } from './WorkItemGridRow';
 import { useBulkActions } from './useBulkActions';
 import { workItemQueryKeys } from './queryKeys';
 import { createWiKeyHandler } from './wiGridKeyHandler';
-import { createWiRowSelection } from './wiRowSelection';
+import { useWiRowSelection } from './wiRowSelection';
 import type { WiGridState } from './useWiGridState';
 
 export interface WiGridLogicProps {
@@ -366,7 +366,7 @@ export function useWiGridLogic(
   }
 
   const { handleCheckboxChange, selectRangeTo, toggleSelectionAt, clearCheckedIds } =
-    createWiRowSelection({
+    useWiRowSelection({
       displayed,
       selectedIndex,
       lastCheckedIndex,
