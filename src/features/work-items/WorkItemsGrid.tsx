@@ -26,6 +26,12 @@ import type { WorkItemSummary } from '@/lib/azdoCommands';
 // Re-export so existing importers (e.g. bulkSelectionSummary.test.ts) keep working.
 export { summarizeBy } from './BulkActionBar';
 
+// Stable empty array for the `extraColumns` default: a fresh `[]` on every
+// render would flow down into the memoized MemoWiRow and defeat its memo,
+// since callers that omit this prop would otherwise pass a new reference
+// every render.
+const EMPTY_EXTRA_COLUMNS: string[] = [];
+
 export function WorkItemsGrid({
   results,
   loading,
@@ -35,7 +41,7 @@ export function WorkItemsGrid({
   dataUpdatedAt,
   isFetching = false,
   activeExternalFilterCount = 0,
-  extraColumns = [],
+  extraColumns = EMPTY_EXTRA_COLUMNS,
   initialSort,
   onClearExternalFilters,
   onSortChange,

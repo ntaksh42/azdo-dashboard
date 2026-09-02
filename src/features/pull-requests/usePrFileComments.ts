@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   commandErrorMessage,
@@ -81,52 +81,74 @@ export function usePrFileComments(pr: ReviewPullRequestSummary) {
     editMutation.isPending ||
     deleteMutation.isPending;
 
-  function startComment(path: string, side: CommentSide, line: number) {
+  // useCallback so it stays referentially stable across renders: it is passed
+  // down through every PrFileDiffSection, which is memoized specifically so
+  // opening a comment box on one file doesn't rebuild every other file's diff.
+  const startComment = useCallback((path: string, side: CommentSide, line: number) => {
     setActionError(null);
     setCommentDraft({ path, side, line });
-  }
+  }, []);
 
-  function cancelComment() {
+  const cancelComment = useCallback(() => {
     setCommentDraft(null);
-  }
+  }, []);
 
-  function postInlineComment(content: string): Promise<void> {
-    if (!commentDraft) return Promise.resolve();
-    return commentMutation
-      .mutateAsync({
+  // TanStack Query keeps `mutate`/`mutateAsync` referentially stable across
+  // renders even though the mutation object wrapping them is not, so depending
+  // on those methods (rather than `commentMutation` etc.) keeps these callbacks
+  // stable too. That matters here: they are passed down through every
+  // PrFileDiffSection, which is memoized specifically so unrelated state
+  // changes don't rebuild every file's diff.
+  const { mutateAsync: mutateComment } = commentMutation;
+  const { mutate: mutateStatus } = statusMutation;
+  const { mutateAsync: mutateEdit } = editMutation;
+  const { mutateAsync: mutateDelete } = deleteMutation;
+
+  const postInlineComment = useCallback(
+    (content: string): Promise<void> => {
+      if (!commentDraft) return Promise.resolve();
+      return mutateComment({
         ...prLocator(pr),
         content,
         filePath: commentDraft.path,
         ...(commentDraft.side === "left"
           ? { leftLine: commentDraft.line }
           : { rightLine: commentDraft.line }),
-      })
-      .then(() => undefined);
-  }
+      }).then(() => undefined);
+    },
+    [commentDraft, mutateComment, pr],
+  );
 
-  function replyToThread(thread: PrThread, content: string): Promise<void> {
-    return commentMutation
-      .mutateAsync({ ...prLocator(pr), threadId: thread.id, content })
-      .then(() => undefined);
-  }
+  const replyToThread = useCallback(
+    (thread: PrThread, content: string): Promise<void> =>
+      mutateComment({ ...prLocator(pr), threadId: thread.id, content }).then(() => undefined),
+    [mutateComment, pr],
+  );
 
-  function toggleThreadStatus(thread: PrThread) {
-    statusMutation.mutate({
-      ...prLocator(pr),
-      threadId: thread.id,
-      status: thread.isResolved ? "active" : "closed",
-    });
-  }
+  const toggleThreadStatus = useCallback(
+    (thread: PrThread) => {
+      mutateStatus({
+        ...prLocator(pr),
+        threadId: thread.id,
+        status: thread.isResolved ? "active" : "closed",
+      });
+    },
+    [mutateStatus, pr],
+  );
 
-  function editComment(thread: PrThread, commentId: number, content: string): Promise<void> {
-    return editMutation
-      .mutateAsync({ ...prLocator(pr), threadId: thread.id, commentId, content })
-      .then(() => undefined);
-  }
+  const editComment = useCallback(
+    (thread: PrThread, commentId: number, content: string): Promise<void> =>
+      mutateEdit({ ...prLocator(pr), threadId: thread.id, commentId, content }).then(
+        () => undefined,
+      ),
+    [mutateEdit, pr],
+  );
 
-  function deleteComment(thread: PrThread, commentId: number): Promise<void> {
-    return deleteMutation.mutateAsync({ ...prLocator(pr), threadId: thread.id, commentId });
-  }
+  const deleteComment = useCallback(
+    (thread: PrThread, commentId: number): Promise<void> =>
+      mutateDelete({ ...prLocator(pr), threadId: thread.id, commentId }),
+    [mutateDelete, pr],
+  );
 
   return {
     actionError,

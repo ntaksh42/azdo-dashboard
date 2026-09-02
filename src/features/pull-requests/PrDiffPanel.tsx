@@ -79,7 +79,7 @@ export function PrDiffPanel({
   onEditComment: (thread: PrThread, commentId: number, content: string) => Promise<void>;
   onDeleteComment: (thread: PrThread, commentId: number) => Promise<void>;
   scrollRequest: CommentScrollRequest | null;
-  registerSectionRef: (path: string) => (el: HTMLDivElement | null) => void;
+  registerSectionRef: (path: string, el: HTMLDivElement | null) => void;
   setViewMode: (mode: ViewMode) => void;
   setShowWholeFile: (updater: (prev: boolean) => boolean) => void;
 }) {
@@ -95,7 +95,7 @@ export function PrDiffPanel({
       wholeFile: showWholeFile,
       eager,
       viewed: isViewed(file.path),
-      onToggleViewed: () => onToggleViewed(file.path),
+      onToggleViewed,
       fileThreads: threadsByFile.get(pathKey(file.path)) ?? [],
       mutationsBusy,
       mentionSearch,
@@ -111,7 +111,7 @@ export function PrDiffPanel({
       onDeleteComment,
       scrollRequest,
       scrollRootRef: diffScrollRef,
-      registerRef: registerSectionRef(file.path),
+      registerRef: registerSectionRef,
     };
   }
 
