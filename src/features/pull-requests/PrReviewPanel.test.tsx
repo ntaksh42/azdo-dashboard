@@ -100,4 +100,26 @@ describe("PrReviewPanel Result tab", () => {
     },
     15000,
   );
+
+  it(
+    "zooms the preview with Ctrl+=/Ctrl+-/Ctrl+0, matching the zoom buttons' tooltips",
+    async () => {
+      renderPanel();
+      await screen.findByRole("button", { name: "Complete" }, { timeout: 8000 });
+
+      const panel = screen.getByRole("button", { name: "Reset preview zoom" }).closest("aside")!;
+      expect(screen.getByRole("button", { name: "Reset preview zoom" }).textContent).toBe("100%");
+
+      fireEvent.keyDown(panel, { key: "=", ctrlKey: true });
+      expect(screen.getByRole("button", { name: "Reset preview zoom" }).textContent).toBe("110%");
+
+      fireEvent.keyDown(panel, { key: "-", ctrlKey: true });
+      fireEvent.keyDown(panel, { key: "-", ctrlKey: true });
+      expect(screen.getByRole("button", { name: "Reset preview zoom" }).textContent).toBe("90%");
+
+      fireEvent.keyDown(panel, { key: "0", ctrlKey: true });
+      expect(screen.getByRole("button", { name: "Reset preview zoom" }).textContent).toBe("100%");
+    },
+    8000,
+  );
 });

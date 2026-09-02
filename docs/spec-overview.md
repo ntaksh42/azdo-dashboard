@@ -349,6 +349,14 @@ PR 検索 / Commits は共通フック `src/lib/useRangeSelection.ts` を使う�
 作業項目プレビューのヘッダーには「Email a link」ボタンがあり、タイトルと URL を
 本文に入れた `mailto:` リンクで既定のメールクライアントを開く (Azure DevOps Web の
 Share 相当、Duplicate ボタンの隣、Tab キーで到達可能)。
+作業項目 / PR / Commits の各プレビューパネルには共通のズームコントロール
+(縮小 / 現在の倍率 / 拡大の3ボタン、`src/components/PreviewZoomControls.tsx`) があり、
+70%〜160% の範囲で 10% 刻みにプレビュー内のテキストとレイアウトを拡大縮小する
+(CSS `zoom` を適用)。倍率は `usePreviewZoom` フックが localStorage
+(`azdodeck:view:previewZoom:v1`) に保存し、3種のプレビュー間で共有する。倍率表示
+ボタンをクリックすると 100% にリセットする。ボタンのほか各プレビューパネル上で
+`Ctrl+=`/`Ctrl+-`/`Ctrl+0` (Cmd 系も可) でも拡大・縮小・リセットでき、テキスト入力欄に
+フォーカスがあっても効く。
 行を1件選択中は、ステータスバーに主要な行ショートカットのコンパクトな凡例を表示する
 (My Reviews / 作業項目グリッド)。Pipelines の監視パイプライン実行行でも
 `↑ ↓ / J K / Home / End` で移動、`Enter` で実行プレビュー、`Ctrl+Enter` で

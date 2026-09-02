@@ -39,6 +39,8 @@ import { PresetMenu } from './PreviewPresetMenu';
 import { StagedStatusChip } from './StagedStatusChip';
 import { useWorkItemStagedChanges } from './useWorkItemStagedChanges';
 import { useWorkItemPickerState } from './useWorkItemPickerState';
+import { usePreviewZoom } from '@/lib/usePreviewZoom';
+import { PreviewZoomControls } from '@/components/PreviewZoomControls';
 
 // Re-exported so existing importers (and the unit tests) keep a single entry
 // point; the implementations live in the sibling modules linked below.
@@ -87,6 +89,7 @@ export function WorkItemPreviewPanel({
   const [selectedPreviewFieldKeys, setSelectedPreviewFieldKeys] = useState<PreviewFieldKey[]>(
     () => loadPreviewFieldKeys(),
   );
+  const { canZoomIn, canZoomOut, resetZoom, zoom, zoomIn, zoomOut } = usePreviewZoom();
   const [mentionDisplayNamesById, setMentionDisplayNamesById] = useState<
     Record<string, string>
   >({});
@@ -246,6 +249,9 @@ export function WorkItemPreviewPanel({
     onDuplicate,
     preview,
     duplicateSelected,
+    zoomIn,
+    zoomOut,
+    resetZoom,
   });
 
   return (
@@ -254,6 +260,18 @@ export function WorkItemPreviewPanel({
       className="flex min-h-0 flex-col overflow-hidden rounded-md border border-border bg-card shadow-sm transition-[border-color,box-shadow] focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/25"
       onKeyDown={handlePreviewPanelKeyDown}
     >
+      {selectedItem && preview ? (
+        <div className="flex shrink-0 items-center justify-end border-b border-border px-2 py-1">
+          <PreviewZoomControls
+            canZoomIn={canZoomIn}
+            canZoomOut={canZoomOut}
+            zoom={zoom}
+            onZoomIn={zoomIn}
+            onZoomOut={zoomOut}
+            onReset={resetZoom}
+          />
+        </div>
+      ) : null}
       {!selectedItem ? (
         <PreviewEmptyState message="Select a work item." />
       ) : (
@@ -266,6 +284,7 @@ export function WorkItemPreviewPanel({
             <>
               <WorkItemPreviewDetails
                 customPreviewFields={customPreviewFields}
+                zoom={zoom}
                 statusChip={
                   <StagedStatusChip
                     stagedEntries={stagedEntries}

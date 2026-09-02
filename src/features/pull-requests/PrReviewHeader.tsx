@@ -14,6 +14,7 @@ import type {
   PullRequestReview,
   ReviewPullRequestSummary,
 } from "@/lib/azdoCommands";
+import { PreviewZoomControls } from "@/components/PreviewZoomControls";
 import { VOTE_DOT_CLASSES, voteTone } from "./voteVisual";
 
 const BADGE_BASE =
@@ -173,6 +174,12 @@ export function PrReviewHeader({
   reviewerActionsBusy = false,
   onToggleReviewerRequired,
   onRemoveReviewer,
+  zoom,
+  canZoomIn,
+  canZoomOut,
+  onZoomIn,
+  onZoomOut,
+  onResetZoom,
 }: {
   selectedPr: ReviewPullRequestSummary | null;
   review: PullRequestReview | null;
@@ -181,7 +188,23 @@ export function PrReviewHeader({
   reviewerActionsBusy?: boolean;
   onToggleReviewerRequired?: (reviewer: PrReviewer) => void;
   onRemoveReviewer?: (reviewer: PrReviewer) => void;
+  zoom: number;
+  canZoomIn: boolean;
+  canZoomOut: boolean;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onResetZoom: () => void;
 }) {
+  const zoomControl = (
+    <PreviewZoomControls
+      canZoomIn={canZoomIn}
+      canZoomOut={canZoomOut}
+      zoom={zoom}
+      onZoomIn={onZoomIn}
+      onZoomOut={onZoomOut}
+      onReset={onResetZoom}
+    />
+  );
   const maximizeButton = onToggleMaximize ? (
     <button
       type="button"
@@ -203,7 +226,10 @@ export function PrReviewHeader({
     return (
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5">
         <span className="text-sm text-muted-foreground">No PR selected</span>
-        <div className="ml-auto">{maximizeButton}</div>
+        <div className="ml-auto flex items-center gap-1">
+          {zoomControl}
+          {maximizeButton}
+        </div>
       </div>
     );
   }
@@ -241,6 +267,7 @@ export function PrReviewHeader({
         >
           {branchLabel}
         </span>
+        {zoomControl}
         {maximizeButton}
       </div>
       {/* The grid already shows the title in split view, so only repeat it in the

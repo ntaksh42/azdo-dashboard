@@ -36,6 +36,9 @@ export function makeWorkItemPreviewKeyDown({
   onDuplicate,
   preview,
   duplicateSelected,
+  zoomIn,
+  zoomOut,
+  resetZoom,
 }: {
   applyStaged: () => Promise<void>;
   discardStaged: () => void;
@@ -58,6 +61,9 @@ export function makeWorkItemPreviewKeyDown({
   onDuplicate: ((draft: WorkItemDuplicateDraft) => void) | undefined;
   preview: WorkItemPreview | null;
   duplicateSelected: () => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetZoom: () => void;
 }) {
   return function handlePreviewPanelKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
     if (
@@ -70,6 +76,27 @@ export function makeWorkItemPreviewKeyDown({
       event.stopPropagation();
       void applyStaged();
       return;
+    }
+
+    // Ctrl/Cmd +, -, 0 zoom the preview, matching the buttons' tooltips.
+    // Checked before the editable-target bailout below so it also works while
+    // a comment or field editor has focus, same as a browser's own zoom keys.
+    if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+      if (event.key === "=" || event.key === "+") {
+        event.preventDefault();
+        zoomIn();
+        return;
+      }
+      if (event.key === "-" || event.key === "_") {
+        event.preventDefault();
+        zoomOut();
+        return;
+      }
+      if (event.key === "0") {
+        event.preventDefault();
+        resetZoom();
+        return;
+      }
     }
 
     if (

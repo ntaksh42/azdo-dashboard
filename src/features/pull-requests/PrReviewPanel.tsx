@@ -11,6 +11,7 @@ import {
   type ReviewPullRequestSummary,
 } from "@/lib/azdoCommands";
 import { focusPrimaryGrid, isEditableTarget } from "@/lib/utils";
+import { usePreviewZoom } from "@/lib/usePreviewZoom";
 import { LoadingState, PreviewEmptyState } from "@/components/StateDisplay";
 import { PrReviewHeader } from "./PrReviewHeader";
 import { ReviewTab } from "./PrReviewTabContents";
@@ -43,6 +44,7 @@ export function PrReviewPanel({
   onToggleMaximize?: () => void;
 }) {
   const [tab, setTab] = useState<PanelTab>("review");
+  const { canZoomIn, canZoomOut, resetZoom, zoom, zoomIn, zoomOut } = usePreviewZoom();
 
   const reviewQuery = useQuery({
     queryKey: [
@@ -104,6 +106,26 @@ export function PrReviewPanel({
   // Esc / ← step back to the grid from anywhere in the preview that is not a
   // text field (composer Esc is handled locally and stops propagation first).
   function handlePreviewKeyDown(event: React.KeyboardEvent) {
+    // Ctrl/Cmd +, -, 0 zoom the preview, matching the buttons' tooltips.
+    // Checked before the editable-target bailout below so it also works while
+    // a comment editor has focus, same as a browser's own zoom keys.
+    if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+      if (event.key === "=" || event.key === "+") {
+        event.preventDefault();
+        zoomIn();
+        return;
+      }
+      if (event.key === "-" || event.key === "_") {
+        event.preventDefault();
+        zoomOut();
+        return;
+      }
+      if (event.key === "0") {
+        event.preventDefault();
+        resetZoom();
+        return;
+      }
+    }
     if (isEditableTarget(event.target) || event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.key === "Escape" || event.key === "ArrowLeft") {
       event.preventDefault();
@@ -138,6 +160,12 @@ export function PrReviewPanel({
             removeReviewerMutation.mutate({ ...prLocator(selectedPr), reviewerId: reviewer.id });
           }
         }}
+        zoom={zoom}
+        canZoomIn={canZoomIn}
+        canZoomOut={canZoomOut}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onResetZoom={resetZoom}
       />
       {reviewerError ? (
         <div className="shrink-0 border-b border-border bg-red-50 px-3 py-1 text-xs text-destructive dark:bg-red-950/40">
@@ -173,21 +201,25 @@ export function PrReviewPanel({
 
       {!selectedPr ? (
         <PreviewEmptyState message="Select a pull request." />
-      ) : tab === "review" ? (
-        <ReviewTab
-          pr={selectedPr}
-          review={reviewQuery.data ?? null}
-          loading={reviewQuery.isLoading}
-          error={reviewQuery.isError ? commandErrorMessage(reviewQuery.error) : null}
-        />
-      ) : tab === "files" ? (
-        <Suspense fallback={<LoadingState />}>
-          <PrFilesTab pr={selectedPr} threads={reviewQuery.data?.threads} />
-        </Suspense>
-      ) : tab === "commits" ? (
-        <CommitsTab pr={selectedPr} />
       ) : (
-        <ResultTab selectedPr={selectedPr} />
+        <div className="flex min-h-0 flex-1 flex-col" style={{ zoom }}>
+          {tab === "review" ? (
+            <ReviewTab
+              pr={selectedPr}
+              review={reviewQuery.data ?? null}
+              loading={reviewQuery.isLoading}
+              error={reviewQuery.isError ? commandErrorMessage(reviewQuery.error) : null}
+            />
+          ) : tab === "files" ? (
+            <Suspense fallback={<LoadingState />}>
+              <PrFilesTab pr={selectedPr} threads={reviewQuery.data?.threads} />
+            </Suspense>
+          ) : tab === "commits" ? (
+            <CommitsTab pr={selectedPr} />
+          ) : (
+            <ResultTab selectedPr={selectedPr} />
+          )}
+        </div>
       )}
     </aside>
   );

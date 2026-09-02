@@ -9,6 +9,8 @@ import {
 } from "@/lib/azdoCommands";
 import { isEditableTarget, focusPrimaryGrid, formatDate } from "@/lib/utils";
 import { openExternalUrl } from "@/lib/openExternal";
+import { usePreviewZoom } from "@/lib/usePreviewZoom";
+import { PreviewZoomControls } from "@/components/PreviewZoomControls";
 import { CommitFilesPanel } from "./CommitFilesPanel";
 import { PR_STATUS_LABELS } from "./commitSearchConstants";
 import { commitPrQueryKey, prStatusBadgeClass } from "./commitSearchUtils";
@@ -104,8 +106,30 @@ export function CommitPreviewPanel({
   onToggleMaximize: () => void;
   onOpenPullRequest?: (query: string, organizationId?: string) => void;
 }) {
+  const { canZoomIn, canZoomOut, resetZoom, zoom, zoomIn, zoomOut } = usePreviewZoom();
+
   // Esc / ← step back to the grid (mirrors the grid's Enter / → into here).
   function handleKeyDown(event: ReactKeyboardEvent) {
+    // Ctrl/Cmd +, -, 0 zoom the preview, matching the buttons' tooltips.
+    // Checked before the editable-target bailout below so it also works while
+    // a comment editor has focus, same as a browser's own zoom keys.
+    if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+      if (event.key === "=" || event.key === "+") {
+        event.preventDefault();
+        zoomIn();
+        return;
+      }
+      if (event.key === "-" || event.key === "_") {
+        event.preventDefault();
+        zoomOut();
+        return;
+      }
+      if (event.key === "0") {
+        event.preventDefault();
+        resetZoom();
+        return;
+      }
+    }
     if (isEditableTarget(event.target) || event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.key === "Escape" || event.key === "ArrowLeft") {
       event.preventDefault();
@@ -136,6 +160,16 @@ export function CommitPreviewPanel({
             Open
           </button>
         ) : null}
+        {commit ? (
+          <PreviewZoomControls
+            canZoomIn={canZoomIn}
+            canZoomOut={canZoomOut}
+            zoom={zoom}
+            onZoomIn={zoomIn}
+            onZoomOut={zoomOut}
+            onReset={resetZoom}
+          />
+        ) : null}
         <button
           type="button"
           onClick={onToggleMaximize}
@@ -143,7 +177,7 @@ export function CommitPreviewPanel({
           aria-label={maximized ? "Restore split view" : "Maximize preview"}
           title={`${maximized ? "Restore split view" : "Maximize preview"} (\\)`}
           className={`shrink-0 rounded p-0.5 text-muted-foreground hover:bg-secondary hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${
-            commit?.webUrl ? "" : "ml-auto"
+            commit?.webUrl || commit ? "" : "ml-auto"
           }`}
         >
           {maximized ? (
@@ -157,6 +191,7 @@ export function CommitPreviewPanel({
         className="min-h-0 flex-1 overflow-y-auto outline-none"
         data-primary-preview="true"
         aria-keyshortcuts="Control+P"
+        style={{ zoom }}
         tabIndex={-1}
       >
         {commit ? (

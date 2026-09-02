@@ -69,6 +69,7 @@ export function WorkItemPreviewDetails({
   onTagsChange,
   onTitleChange,
   titlePending,
+  zoom,
 }: {
   customPreviewFields: CustomPreviewField[];
   preview: WorkItemPreview;
@@ -105,6 +106,7 @@ export function WorkItemPreviewDetails({
   onTagsChange: (tags: string[]) => void;
   onTitleChange: (title: string) => void;
   titlePending: boolean;
+  zoom: number;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -148,6 +150,7 @@ export function WorkItemPreviewDetails({
       aria-label="Work item preview"
       className="min-h-0 flex-1 overflow-auto bg-card px-2.5 pb-2 pt-1.5 text-xs outline-none focus:bg-primary/[0.02]"
       data-primary-preview="true"
+      style={{ zoom }}
       onKeyDown={(event) => {
         // ← steps back to the grid (mirrors the grid's → into the preview).
         if (
