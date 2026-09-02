@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useLatestRef } from "./useLatestRef";
 
 // Shift/Ctrl row multi-selection shared by the grids that only track a single
 // roving `selectedIndex` (My Pull Requests, PR search, Commits). Rows are
@@ -31,6 +32,14 @@ export function useRangeSelection<T>({
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [anchorKey, setAnchorKey] = useState<string | null>(null);
 
+  // `rows` is a fresh array on most renders (filtering/sorting/sync),
+  // `selectedIndex` changes on every arrow key, and callers pass `keyOf` as an
+  // inline arrow function, so capturing any of them directly in the callbacks
+  // below would make extendTo/toggleAt/clear/handleRowClick unstable across
+  // nearly every render — defeating any row-level memoization built on top of
+  // this hook. Read them from a ref, refreshed each render, instead.
+  const depsRef = useLatestRef({ rows, selectedIndex, keyOf, anchorKey });
+
   // Drop keys whose rows disappeared (filter change, sync) so the status bar
   // and copy action never report rows the user cannot see.
   useEffect(() => {
@@ -43,49 +52,43 @@ export function useRangeSelection<T>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows]);
 
-  const extendTo = useCallback(
-    (index: number) => {
-      const target = rows[index];
-      if (!target) return;
-      const anchor = anchorKey ?? keyOf(rows[selectedIndex] ?? target);
-      const anchorIndex = rows.findIndex((row) => keyOf(row) === anchor);
-      if (anchorIndex < 0) return;
-      const [from, to] =
-        anchorIndex <= index ? [anchorIndex, index] : [index, anchorIndex];
-      const next = new Set<string>();
-      for (let i = from; i <= to; i += 1) {
-        const row = rows[i];
-        if (row) next.add(keyOf(row));
-      }
-      setAnchorKey(anchor);
-      setSelectedKeys(next);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, anchorKey, selectedIndex],
-  );
+  const extendTo = useCallback((index: number) => {
+    const { rows, selectedIndex, keyOf, anchorKey } = depsRef.current;
+    const target = rows[index];
+    if (!target) return;
+    const anchor = anchorKey ?? keyOf(rows[selectedIndex] ?? target);
+    const anchorIndex = rows.findIndex((row) => keyOf(row) === anchor);
+    if (anchorIndex < 0) return;
+    const [from, to] =
+      anchorIndex <= index ? [anchorIndex, index] : [index, anchorIndex];
+    const next = new Set<string>();
+    for (let i = from; i <= to; i += 1) {
+      const row = rows[i];
+      if (row) next.add(keyOf(row));
+    }
+    setAnchorKey(anchor);
+    setSelectedKeys(next);
+  }, []);
 
-  const toggleAt = useCallback(
-    (index: number) => {
-      const target = rows[index];
-      if (!target) return;
-      const key = keyOf(target);
-      setSelectedKeys((prev) => {
-        const next = new Set(prev);
-        // A Ctrl+click on a grid with no explicit multi-selection yet should
-        // build on the row the user already has selected, not start from empty.
-        if (next.size === 0) {
-          const current = rows[selectedIndex];
-          if (current) next.add(keyOf(current));
-        }
-        if (next.has(key)) next.delete(key);
-        else next.add(key);
-        return next;
-      });
-      setAnchorKey(key);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, selectedIndex],
-  );
+  const toggleAt = useCallback((index: number) => {
+    const { rows, selectedIndex, keyOf } = depsRef.current;
+    const target = rows[index];
+    if (!target) return;
+    const key = keyOf(target);
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      // A Ctrl+click on a grid with no explicit multi-selection yet should
+      // build on the row the user already has selected, not start from empty.
+      if (next.size === 0) {
+        const current = rows[selectedIndex];
+        if (current) next.add(keyOf(current));
+      }
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    setAnchorKey(key);
+  }, []);
 
   const clear = useCallback(() => {
     setSelectedKeys((prev) => (prev.size === 0 ? prev : new Set()));

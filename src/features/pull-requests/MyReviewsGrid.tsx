@@ -14,7 +14,7 @@ import { openExternalUrl } from '@/lib/openExternal';
 import { copyRowUrls } from '@/lib/copyUrls';
 import { toggleTriageArchived } from '@/lib/triage';
 import { PrReviewPanel } from './PrReviewPanel';
-import { ReviewPrRow } from './ReviewPrRow';
+import { MemoReviewPrRow } from './MemoReviewPrRow';
 import { ReviewFilterBar } from './ReviewFilterBar';
 import { ReviewStatusBar } from './ReviewStatusBar';
 import { OverlapPopup } from './OverlapPopup';
@@ -294,9 +294,9 @@ export function MyReviewsGrid({
                         );
                       }
                       return (
-                        <ReviewPrRow
+                        <MemoReviewPrRow
                           key={`${row.pr.organizationId}-${row.pr.repositoryId}-${row.pr.pullRequestId}`}
-                          ref={(el) => { g.rowRefs.current[row.prIndex] = el; }}
+                          prIndex={row.prIndex}
                           columnTemplate={g.COLS}
                           pr={row.pr}
                           selected={row.prIndex === g.selectedIndex}
@@ -304,19 +304,11 @@ export function MyReviewsGrid({
                           returned={g.returnedKeys.has(reviewTriageKey(row.pr))}
                           visibleColumns={g.visibleColumns}
                           staleThresholdDays={g.staleThresholdDays}
-                          onSelect={({ shiftKey, ctrlKey }) => {
-                            if (shiftKey) {
-                              const anchorKey = g.selectionAnchor ?? reviewTriageKey(g.sortedPrs[g.selectedIndex] ?? row.pr);
-                              g.setSelectedIndex(row.prIndex);
-                              g.extendSelectionToIndex(row.prIndex, anchorKey);
-                            } else if (ctrlKey) {
-                              g.toggleSelectionAt(row.prIndex);
-                              g.setSelectedIndex(row.prIndex);
-                            } else {
-                              g.clearMultiSelection();
-                              g.setSelectedIndex(row.prIndex);
-                            }
-                          }}
+                          rowRefs={g.rowRefs}
+                          setSelectedIndex={g.setSelectedIndex}
+                          extendSelectionToIndex={g.extendSelectionToIndex}
+                          toggleSelectionAt={g.toggleSelectionAt}
+                          clearMultiSelection={g.clearMultiSelection}
                         />
                       );
                     })}

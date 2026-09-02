@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { listPullRequestChanges, prLocator, type ReviewPullRequestSummary } from '@/lib/azdoCommands';
 import { recordRecentPullRequest } from '@/lib/recentItems';
 import { useGridFocusRestoration } from '@/lib/useGridFocusRestoration';
+import { useLatestRef } from '@/lib/useLatestRef';
 import { detectFileOverlaps } from '@/lib/prOverlap';
 import { acknowledgeReturn } from './reviewReturnTracking';
 import { reviewTriageKey } from './myReviewsHelpers';
@@ -45,6 +46,14 @@ export function useMyReviewsSelectionState({
   const overlapButtonRef = useRef<HTMLButtonElement | null>(null);
   const pendingSelectRef = useRef<MyReviewsSelectRequest | null>(null);
 
+  // MyReviewsGrid's rows are memoized (React.memo), so extendSelectionToIndex
+  // and toggleSelectionAt — which every row's onClick calls — must keep a
+  // stable identity across renders or the memoization is defeated on every
+  // selection change. `sortedPrs`/`visibleSortedIndexes`/`selectedIndex`/
+  // `selectionAnchor` all change often, so they are read through a ref
+  // (refreshed every render) instead of being captured directly.
+  const depsRef = useLatestRef({ sortedPrs, visibleSortedIndexes, selectedIndex, selectionAnchor });
+
   // ── Navigation helpers ─────────────────────────────────────────────────────
   function focusRow(index: number) {
     rowRefs.current[index]?.focus();
@@ -78,7 +87,8 @@ export function useMyReviewsSelectionState({
     selectVisiblePosition((position < 0 ? 0 : position) + delta);
   }
 
-  function extendSelectionToIndex(targetIndex: number, explicitAnchorKey?: string) {
+  const extendSelectionToIndex = useCallback((targetIndex: number, explicitAnchorKey?: string) => {
+    const { sortedPrs, visibleSortedIndexes, selectedIndex, selectionAnchor } = depsRef.current;
     const anchorKey =
       explicitAnchorKey ??
       selectionAnchor ??
@@ -99,11 +109,12 @@ export function useMyReviewsSelectionState({
     }
     setSelectionAnchor(anchorKey);
     setSelectedKeys(keys);
-  }
+  }, []);
 
   // Ctrl+click adds or removes one row, seeding from the focused row so the
   // first Ctrl+click grows the selection instead of replacing it.
-  function toggleSelectionAt(targetIndex: number) {
+  const toggleSelectionAt = useCallback((targetIndex: number) => {
+    const { sortedPrs, selectedIndex } = depsRef.current;
     const target = sortedPrs[targetIndex];
     if (!target) return;
     const key = reviewTriageKey(target);
@@ -118,13 +129,13 @@ export function useMyReviewsSelectionState({
       return next;
     });
     setSelectionAnchor(key);
-  }
+  }, []);
 
-  function clearMultiSelection() {
-    if (selectedKeys.size > 0) setSelectedKeys(new Set());
+  const clearMultiSelection = useCallback(() => {
+    setSelectedKeys((prev) => (prev.size > 0 ? new Set() : prev));
     setSelectionAnchor(null);
     setOverlapPopupOpen(false);
-  }
+  }, []);
 
   // ── Effects ────────────────────────────────────────────────────────────────
   // Keep selection on a visible row when data shrinks or a section collapses.

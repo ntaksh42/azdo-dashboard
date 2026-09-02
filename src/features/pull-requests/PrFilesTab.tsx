@@ -190,12 +190,10 @@ export function PrFilesTab({
     [pr.organizationId],
   );
 
-  function registerSectionRef(path: string) {
-    return (el: HTMLDivElement | null) => {
-      if (el) sectionRefs.current.set(path, el);
-      else sectionRefs.current.delete(path);
-    };
-  }
+  const registerSectionRef = useCallback((path: string, el: HTMLDivElement | null) => {
+    if (el) sectionRefs.current.set(path, el);
+    else sectionRefs.current.delete(path);
+  }, []);
 
   function scrollToSection(path: string, behavior: ScrollBehavior) {
     requestAnimationFrame(() => {
@@ -238,16 +236,22 @@ export function PrFilesTab({
     });
   }
 
-  function toggleViewed(path: string) {
-    setViewedKeys((prev) => {
-      const next = new Set(prev);
-      const key = fileViewedKey(path);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      window.localStorage.setItem(viewedStorageKey(pr), JSON.stringify([...next]));
-      return next;
-    });
-  }
+  // useCallback so it stays referentially stable across renders: it is passed
+  // down through every PrFileDiffSection, which is memoized specifically so an
+  // unrelated file's state change doesn't rebuild this file's diff.
+  const toggleViewed = useCallback(
+    (path: string) => {
+      setViewedKeys((prev) => {
+        const next = new Set(prev);
+        const key = fileViewedKey(path);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        window.localStorage.setItem(viewedStorageKey(pr), JSON.stringify([...next]));
+        return next;
+      });
+    },
+    [pr],
+  );
 
   // Bulk-mark every changed file viewed (or clear them all) in one action.
   function setAllViewed(viewed: boolean) {

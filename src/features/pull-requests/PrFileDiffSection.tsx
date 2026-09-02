@@ -1,4 +1,4 @@
-import { type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, type RefObject, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, Loader2 } from "lucide-react";
 import {
@@ -30,7 +30,15 @@ import {
 // that every section loads at once.
 const LAZY_LOAD_ROOT_MARGIN = "800px 0px";
 
-export function PrFileDiffSection({
+// Memoized so that a state change unrelated to this file (opening a comment box
+// on another file, toggling another file's viewed checkbox, scrolling) does not
+// rebuild this file's diff, which can be up to MAX_RENDERED_DIFF_LINES rows.
+// This only helps because every prop below is referentially stable across
+// unrelated renders: `onToggleViewed`/`onStartComment`/`registerRef` take
+// `file.path` as an argument here (bound via useCallback) instead of being
+// pre-bound per file by the caller, which used to make them new closures on
+// every render of the whole file list.
+export const PrFileDiffSection = memo(function PrFileDiffSection({
   pr,
   file,
   baseCommitId,
@@ -67,7 +75,7 @@ export function PrFileDiffSection({
   // should load immediately instead of waiting on IntersectionObserver.
   eager: boolean;
   viewed: boolean;
-  onToggleViewed: () => void;
+  onToggleViewed: (path: string) => void;
   fileThreads: PrThread[];
   mutationsBusy: boolean;
   mentionSearch: (query: string) => Promise<MentionCandidate[]>;
@@ -83,11 +91,22 @@ export function PrFileDiffSection({
   onDeleteComment: (thread: PrThread, commentId: number) => Promise<void>;
   scrollRequest: CommentScrollRequest | null;
   scrollRootRef: RefObject<HTMLDivElement | null>;
-  registerRef: (el: HTMLDivElement | null) => void;
+  registerRef: (path: string, el: HTMLDivElement | null) => void;
 }) {
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const [enabled, setEnabled] = useState(eager);
+  const path = file.path;
+
+  const handleToggleViewed = useCallback(() => onToggleViewed(path), [onToggleViewed, path]);
+  const handleRegisterRef = useCallback(
+    (el: HTMLDivElement | null) => registerRef(path, el),
+    [registerRef, path],
+  );
+  const handleStartComment = useCallback(
+    (side: CommentSide, line: number) => onStartComment(path, side, line),
+    [onStartComment, path],
+  );
 
   // Defer the diff fetch until the section scrolls near the viewport.
   useEffect(() => {
@@ -251,7 +270,7 @@ export function PrFileDiffSection({
     <div
       ref={(el) => {
         sectionRef.current = el;
-        registerRef(el);
+        handleRegisterRef(el);
       }}
       data-file-section={file.path}
       style={{ scrollMarginTop: SECTION_HEADER_HEIGHT }}
@@ -270,7 +289,7 @@ export function PrFileDiffSection({
           </span>
         ) : null}
         <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[11px] text-muted-foreground">
-          <input type="checkbox" checked={viewed} onChange={onToggleViewed} className="h-3 w-3" />
+          <input type="checkbox" checked={viewed} onChange={handleToggleViewed} className="h-3 w-3" />
           Viewed
         </label>
         {pr.webUrl ? (
@@ -317,10 +336,11 @@ export function PrFileDiffSection({
             wholeFile={wholeFile}
             lineAttachments={lineAttachments}
             lineHasContent={lineHasContent}
-            onStartComment={(side, line) => onStartComment(file.path, side, line)}
+            onStartComment={handleStartComment}
           />
         ) : null}
       </div>
     </div>
   );
-}
+});
+PrFileDiffSection.displayName = "PrFileDiffSection";

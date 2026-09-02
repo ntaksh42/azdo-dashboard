@@ -48,7 +48,8 @@ import {
   compareCommitsByKey,
   defaultCommitSortDir,
 } from "./commitSearchUtils";
-import { CommitGridRow, CommitSortHeaderButton } from "./CommitGridRow";
+import { CommitSortHeaderButton } from "./CommitGridRow";
+import { MemoCommitRow } from "./MemoCommitRow";
 import { CommitPreviewPanel } from "./CommitPreviewPanel";
 import { useAdaptivePreviewWidth } from "@/lib/useAdaptivePreviewWidth";
 
@@ -400,9 +401,9 @@ export function CommitResults({
                 {virtualRows.map((commit, offset) => {
                   const index = firstVirtualRow + offset;
                   return (
-                    <CommitGridRow
+                    <MemoCommitRow
                       key={`${commit.repositoryId}:${commit.commitId}`}
-                      ref={(el) => { rowRefs.current[index] = el; }}
+                      index={index}
                       commit={commit}
                       selected={index === selectedIndex}
                       inMultiSelection={selection.selectedKeys.has(
@@ -410,9 +411,9 @@ export function CommitResults({
                       )}
                       columnTemplate={commitColTemplate}
                       visibleColumns={visibleColumns}
-                      onSelect={(modifiers) =>
-                        selection.handleRowClick(index, modifiers, setSelectedIndex)
-                      }
+                      rowRefs={rowRefs}
+                      handleRowClick={selection.handleRowClick}
+                      setSelectedIndex={setSelectedIndex}
                     />
                   );
                 })}
