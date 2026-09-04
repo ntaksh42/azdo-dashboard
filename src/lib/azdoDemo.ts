@@ -14,6 +14,7 @@ import type {
   GetReviewResultPreviewInput,
   GetSavedQueryInput,
   GetWorkItemPreviewInput,
+  GetWorkItemResultPreviewInput,
   ListPullRequestChangesInput,
   CountWorkItemQueryHistoryInput,
   ListWorkItemFieldAllowedValuesInput,
@@ -49,6 +50,7 @@ import {
   demoDiagnosticsExport,
   demoOrganization,
   demoReviewResultPreview,
+  demoWorkItemResultPreview,
   DEMO_PREVIEW_IMAGE_DATA_URL,
   writeCommands,
 } from "@/lib/demo/settings";
@@ -150,6 +152,13 @@ export async function demoInvoke(command: string, args?: unknown): Promise<unkno
     case "get_review_result_preview": {
       const input = (args as { input?: GetReviewResultPreviewInput } | undefined)?.input;
       return demoReviewResultPreview(demoSettings.reviewResultFolderPath, input?.pullRequestId);
+    }
+    case "get_work_item_result_preview": {
+      const input = (args as { input?: GetWorkItemResultPreviewInput } | undefined)?.input;
+      return demoWorkItemResultPreview(
+        demoSettings.workItemResultFolderPath,
+        input?.workItemId,
+      );
     }
     case "export_diagnostics": {
       const input = (args as { input?: ExportDiagnosticsInput } | undefined)?.input;

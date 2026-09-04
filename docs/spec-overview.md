@@ -276,6 +276,7 @@ Notifications (未読通知件数、99 超は「99+」)。0/未取得時は非�
 | 設定 | 内容 |
 |---|---|
 | `review_result_folder_path` | レビュー結果 HTML を格納するフォルダ。My Reviews のプレビューが PR 番号を含むファイルを照合。 |
+| `work_item_result_folder_path` | 作業項目の調査結果 HTML を格納するフォルダ。Work Item Views のプレビューが作業項目 ID の数字列を含むファイルを照合。 |
 | `show_window_hotkey` | ウィンドウを前面化するグローバルホットキー。 |
 | `read_only_validation_mode_enabled` | 読み取り専用モード (誤操作によるミューテーションを抑止)。既定 false。 |
 | `desktop_notifications_enabled` | デスクトップ通知の総合トグル。既定 false。 |

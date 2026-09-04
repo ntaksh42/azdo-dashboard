@@ -100,6 +100,7 @@ describe("App — Settings", () => {
       expect(invokeMock).toHaveBeenCalledWith("update_app_settings", {
         input: {
           reviewResultFolderPath: "D:\\azdo-review-results",
+          workItemResultFolderPath: null,
           showWindowHotkey: null,
           readOnlyValidationModeEnabled: false,
           desktopNotificationsEnabled: false,
@@ -168,6 +169,7 @@ describe("App — Settings", () => {
       expect(invokeMock).toHaveBeenCalledWith("update_app_settings", {
         input: {
           reviewResultFolderPath: "C:\\reports",
+          workItemResultFolderPath: null,
           showWindowHotkey: "Ctrl+Alt+D",
           readOnlyValidationModeEnabled: false,
           desktopNotificationsEnabled: false,
@@ -234,6 +236,7 @@ describe("App — Settings", () => {
       expect(invokeMock).toHaveBeenCalledWith("update_app_settings", {
         input: {
           reviewResultFolderPath: null,
+          workItemResultFolderPath: null,
           showWindowHotkey: null,
           readOnlyValidationModeEnabled: false,
           desktopNotificationsEnabled: true,
@@ -293,12 +296,13 @@ describe("App — Settings", () => {
     expect(await screen.findByRole("heading", { name: "Validation mode" })).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText("Read-only validation mode"));
-    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[3]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[4]);
 
     await waitFor(() => {
       expect(invokeMock).toHaveBeenCalledWith("update_app_settings", {
         input: {
           reviewResultFolderPath: null,
+          workItemResultFolderPath: null,
           showWindowHotkey: null,
           readOnlyValidationModeEnabled: true,
           desktopNotificationsEnabled: false,
@@ -362,7 +366,7 @@ describe("App — Settings", () => {
     fireEvent.click(screen.getByLabelText("Enable experimental features"));
     fireEvent.click(screen.getByLabelText("Local usage stats"));
     fireEvent.click(screen.getByLabelText("Automatic update check"));
-    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[4]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[5]);
 
     await waitFor(() => {
       expect(invokeMock).toHaveBeenCalledWith("update_app_settings", {
@@ -405,7 +409,7 @@ describe("App — Settings", () => {
     });
 
     fireEvent.click(screen.getByLabelText("Enable experimental features"));
-    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[4]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[5]);
 
     await waitFor(() => {
       expect(invokeMock).toHaveBeenCalledWith("update_app_settings", {
@@ -429,7 +433,7 @@ describe("App — Settings", () => {
     await openSettings();
 
     fireEvent.click(screen.getByLabelText("Read-only validation mode"));
-    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[3]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[4]);
 
     await waitFor(() => {
       expect(invokeMock).toHaveBeenCalledWith("update_app_settings", {

@@ -35,6 +35,7 @@ export type NotificationRule = z.infer<typeof notificationRuleSchema>;
 
 const appSettingsSchema = z.object({
   reviewResultFolderPath: z.string().nullable(),
+  workItemResultFolderPath: z.string().nullable().default(null),
   showWindowHotkey: z.string().nullable().default(null),
   readOnlyValidationModeEnabled: z.boolean().default(false),
   desktopNotificationsEnabled: z.boolean().default(false),
@@ -71,6 +72,15 @@ const reviewResultPreviewSchema = z.object({
 });
 
 export type ReviewResultPreview = z.infer<typeof reviewResultPreviewSchema>;
+
+const workItemResultPreviewSchema = z.object({
+  workItemId: z.number(),
+  fileName: z.string(),
+  filePath: z.string(),
+  html: z.string(),
+});
+
+export type WorkItemResultPreview = z.infer<typeof workItemResultPreviewSchema>;
 
 const diagnosticsExportSchema = z.object({
   filePath: z.string(),
@@ -168,6 +178,7 @@ export type DeleteOrganizationInput = {
 
 export type UpdateAppSettingsInput = {
   reviewResultFolderPath?: string | null;
+  workItemResultFolderPath?: string | null;
   showWindowHotkey?: string | null;
   readOnlyValidationModeEnabled?: boolean;
   desktopNotificationsEnabled?: boolean;
@@ -190,6 +201,10 @@ export type UpdateAppSettingsInput = {
 
 export type GetReviewResultPreviewInput = {
   pullRequestId: number;
+};
+
+export type GetWorkItemResultPreviewInput = {
+  workItemId: number;
 };
 
 export type TriggerSyncInput = {
@@ -218,6 +233,13 @@ export async function getReviewResultPreview(
 ): Promise<ReviewResultPreview | null> {
   const result = await invokeCommand("get_review_result_preview", { input });
   return reviewResultPreviewSchema.nullable().parse(result);
+}
+
+export async function getWorkItemResultPreview(
+  input: GetWorkItemResultPreviewInput,
+): Promise<WorkItemResultPreview | null> {
+  const result = await invokeCommand("get_work_item_result_preview", { input });
+  return workItemResultPreviewSchema.nullable().parse(result);
 }
 
 export async function addPatOrganization(

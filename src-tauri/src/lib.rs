@@ -148,6 +148,7 @@ pub fn run() {
             commands::settings::get_app_settings,
             commands::settings::update_app_settings,
             commands::settings::get_review_result_preview,
+            commands::settings::get_work_item_result_preview,
             commands::settings::list_sync_states,
             commands::settings::export_diagnostics,
             commands::snooze::snooze_item,

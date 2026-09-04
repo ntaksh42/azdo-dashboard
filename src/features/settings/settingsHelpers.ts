@@ -11,6 +11,7 @@ export function settingsInput(
 ): UpdateAppSettingsInput {
   return {
     reviewResultFolderPath: settings?.reviewResultFolderPath ?? null,
+    workItemResultFolderPath: settings?.workItemResultFolderPath ?? null,
     showWindowHotkey: settings?.showWindowHotkey ?? null,
     readOnlyValidationModeEnabled:
       settings?.readOnlyValidationModeEnabled ?? false,

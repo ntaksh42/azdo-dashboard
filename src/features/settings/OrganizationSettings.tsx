@@ -23,12 +23,14 @@ import { ExperimentalDiagnostics } from './ExperimentalDiagnostics';
 import { DesktopNotificationSettings } from './DesktopNotificationSettings';
 import { NotificationRulesSettings } from './NotificationRulesSettings';
 import { ReviewResultFolderSettings } from './ReviewResultFolderSettings';
+import { WorkItemResultFolderSettings } from './WorkItemResultFolderSettings';
 import { ReviewStaleThresholdSettings, WorkItemStaleThresholdSettings } from './StaleThresholdSettings';
 import { ShowWindowHotkeySettings } from './ShowWindowHotkeySettings';
 import { KeyboardShortcutSettings } from './KeyboardShortcutSettings';
 
 export { SetupPanel } from './SetupPanel';
 export { ReviewResultFolderSettings } from './ReviewResultFolderSettings';
+export { WorkItemResultFolderSettings } from './WorkItemResultFolderSettings';
 export { ReviewStaleThresholdSettings, WorkItemStaleThresholdSettings } from './StaleThresholdSettings';
 export { NotificationRulesSettings } from './NotificationRulesSettings';
 export { ShowWindowHotkeySettings } from './ShowWindowHotkeySettings';
@@ -70,6 +72,7 @@ export function OrganizationSettings({
       <DesktopNotificationSettings />
       <NotificationRulesSettings />
       <ReviewResultFolderSettings />
+      <WorkItemResultFolderSettings />
       <QuickPipelinesSettings organizations={organizations} />
       <ReviewStaleThresholdSettings />
       <WorkItemStaleThresholdSettings />

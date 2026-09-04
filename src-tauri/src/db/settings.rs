@@ -41,6 +41,7 @@ impl NotificationRule {
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub review_result_folder_path: Option<String>,
+    pub work_item_result_folder_path: Option<String>,
     pub show_window_hotkey: Option<String>,
     pub read_only_validation_mode_enabled: bool,
     pub desktop_notifications_enabled: bool,
@@ -73,6 +74,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             review_result_folder_path: None,
+            work_item_result_folder_path: None,
             show_window_hotkey: None,
             read_only_validation_mode_enabled: false,
             desktop_notifications_enabled: false,
@@ -149,6 +151,7 @@ impl AppDatabase {
 pub(crate) fn get_app_settings(conn: &Connection) -> Result<AppSettings> {
     Ok(AppSettings {
         review_result_folder_path: get_setting(conn, "review_result_folder_path")?,
+        work_item_result_folder_path: get_setting(conn, "work_item_result_folder_path")?,
         show_window_hotkey: get_setting(conn, "show_window_hotkey")?,
         read_only_validation_mode_enabled: get_bool_setting(
             conn,
@@ -232,6 +235,11 @@ pub(crate) fn update_app_settings(conn: &Connection, settings: AppSettings) -> R
         conn,
         "review_result_folder_path",
         settings.review_result_folder_path.as_deref(),
+    )?;
+    set_setting(
+        conn,
+        "work_item_result_folder_path",
+        settings.work_item_result_folder_path.as_deref(),
     )?;
     set_setting(
         conn,

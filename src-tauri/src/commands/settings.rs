@@ -6,7 +6,8 @@ use crate::db::{AppSettings, SyncState};
 use crate::error::Result;
 use crate::settings::{
     normalize_app_settings, DiagnosticsExport, ExportDiagnosticsInput, GetReviewResultPreviewInput,
-    ReviewResultPreview, UpdateAppSettingsInput,
+    GetWorkItemResultPreviewInput, ReviewResultPreview, UpdateAppSettingsInput,
+    WorkItemResultPreview,
 };
 
 #[tauri::command]
@@ -36,6 +37,16 @@ pub async fn get_review_result_preview(
 ) -> Result<Option<ReviewResultPreview>> {
     let service = state.settings.clone();
     run_blocking(move || service.review_result_preview(input)).await
+}
+
+#[tauri::command]
+#[tracing::instrument(skip(state))]
+pub async fn get_work_item_result_preview(
+    input: GetWorkItemResultPreviewInput,
+    state: State<'_, AppState>,
+) -> Result<Option<WorkItemResultPreview>> {
+    let service = state.settings.clone();
+    run_blocking(move || service.work_item_result_preview(input)).await
 }
 
 #[tauri::command]

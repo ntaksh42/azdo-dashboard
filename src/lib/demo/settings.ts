@@ -4,6 +4,7 @@ import type {
   ReviewResultPreview,
   SyncState,
   UpdateAppSettingsInput,
+  WorkItemResultPreview,
 } from "@/lib/azdoCommands";
 import {
   DEFAULT_REVIEW_STALE_THRESHOLD_DAYS,
@@ -59,6 +60,7 @@ export const writeCommands = new Set([
 
 export const DEFAULT_DEMO_SETTINGS: AppSettings = {
   reviewResultFolderPath: "C:\\reports\\azdo-reviews",
+  workItemResultFolderPath: "C:\\reports\\azdo-work-items",
   showWindowHotkey: null,
   readOnlyValidationModeEnabled: false,
   desktopNotificationsEnabled: false,
@@ -108,6 +110,10 @@ export function applyDemoSettingsUpdate(
       input && "reviewResultFolderPath" in input
         ? input.reviewResultFolderPath?.trim() || null
         : current.reviewResultFolderPath,
+    workItemResultFolderPath:
+      input && "workItemResultFolderPath" in input
+        ? input.workItemResultFolderPath?.trim() || null
+        : current.workItemResultFolderPath,
     showWindowHotkey:
       input && "showWindowHotkey" in input
         ? input.showWindowHotkey?.trim() || null
@@ -275,6 +281,43 @@ export function demoReviewResultPreview(
     <h1>${title}</h1>
     <p class="status">Review result file matched by <code>PR${pullRequestId}</code>.</p>
     <p>No blocking issues found in the generated review summary.</p>
+  </body>
+</html>`,
+  };
+}
+
+export function demoWorkItemResultPreview(
+  folderPath: string | null,
+  workItemId: number | undefined,
+): WorkItemResultPreview | null {
+  if (!folderPath || !workItemId) {
+    return null;
+  }
+  if (workItemId !== 123 && workItemId !== 118) {
+    return null;
+  }
+
+  const title =
+    workItemId === 123 ? "Rate limiting rollout analysis" : "Payment crash investigation";
+  return {
+    workItemId,
+    fileName: `${workItemId}-result.html`,
+    filePath: `${folderPath}\\${workItemId}-result.html`,
+    html: `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { color: #111827; font: 14px/1.5 system-ui, sans-serif; margin: 24px; }
+      h1 { font-size: 20px; margin: 0 0 12px; }
+      .status { background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 10px 12px; }
+      code { background: #f3f4f6; border-radius: 4px; padding: 2px 4px; }
+    </style>
+  </head>
+  <body>
+    <h1>${title}</h1>
+    <p class="status">Result file matched by work item id <code>${workItemId}</code>.</p>
+    <p>No blocking issues found in the generated investigation summary.</p>
   </body>
 </html>`,
   };

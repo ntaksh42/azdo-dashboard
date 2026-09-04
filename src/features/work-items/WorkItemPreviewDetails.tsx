@@ -23,6 +23,7 @@ import { CollapsibleComment } from "./CollapsibleComment";
 import { WorkItemHistorySection } from "./WorkItemHistorySection";
 import { FieldConfigMenu } from "./FieldConfigMenu";
 import { WorkItemLinksSection } from "./WorkItemLinksSection";
+import { WorkItemResultSection } from "./WorkItemResultSection";
 import {
   isWidePreviewField,
   previewFieldValue,
@@ -351,6 +352,10 @@ export function WorkItemPreviewDetails({
           </p>
         </PreviewSection>
       ) : null}
+
+      <div className="mt-2">
+        <WorkItemResultSection workItemId={preview.id} />
+      </div>
 
       <WorkItemLinksSection preview={preview} />
 

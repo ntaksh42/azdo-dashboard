@@ -17,6 +17,7 @@ use crate::error::{AppError, Result};
 #[serde(rename_all = "camelCase")]
 pub struct UpdateAppSettingsInput {
     pub review_result_folder_path: Option<String>,
+    pub work_item_result_folder_path: Option<String>,
     pub show_window_hotkey: Option<String>,
     pub read_only_validation_mode_enabled: Option<bool>,
     pub desktop_notifications_enabled: Option<bool>,
@@ -45,6 +46,12 @@ pub struct GetReviewResultPreviewInput {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct GetWorkItemResultPreviewInput {
+    pub work_item_id: i64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ExportDiagnosticsInput {
     /// Replace organization identifiers with `<org-N>` placeholders.
     #[serde(default)]
@@ -64,6 +71,15 @@ pub struct DiagnosticsExport {
 #[serde(rename_all = "camelCase")]
 pub struct ReviewResultPreview {
     pub pull_request_id: i64,
+    pub file_name: String,
+    pub file_path: String,
+    pub html: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkItemResultPreview {
+    pub work_item_id: i64,
     pub file_name: String,
     pub file_path: String,
     pub html: String,
@@ -148,6 +164,7 @@ impl SettingsService {
 pub fn normalize_app_settings(input: UpdateAppSettingsInput) -> AppSettings {
     AppSettings {
         review_result_folder_path: normalize_path(input.review_result_folder_path),
+        work_item_result_folder_path: normalize_path(input.work_item_result_folder_path),
         show_window_hotkey: normalize_path(input.show_window_hotkey),
         read_only_validation_mode_enabled: input.read_only_validation_mode_enabled.unwrap_or(false),
         desktop_notifications_enabled: input.desktop_notifications_enabled.unwrap_or(false),
@@ -240,6 +257,45 @@ impl SettingsService {
             html,
         }))
     }
+
+    pub fn work_item_result_preview(
+        &self,
+        input: GetWorkItemResultPreviewInput,
+    ) -> Result<Option<WorkItemResultPreview>> {
+        if input.work_item_id <= 0 {
+            return Err(AppError::InvalidInput(
+                "workItemId must be greater than zero".to_string(),
+            ));
+        }
+
+        let settings = self.db.get_app_settings()?;
+        let Some(folder_path) = settings.work_item_result_folder_path else {
+            return Ok(None);
+        };
+
+        let folder = PathBuf::from(folder_path);
+        if !folder.is_dir() {
+            return Err(AppError::InvalidInput(format!(
+                "work item result folder does not exist: {}",
+                folder.display()
+            )));
+        }
+
+        let Some(file_path) = find_work_item_result_file(&folder, input.work_item_id)? else {
+            return Ok(None);
+        };
+        let html = fs::read_to_string(&file_path)?;
+        Ok(Some(WorkItemResultPreview {
+            work_item_id: input.work_item_id,
+            file_name: file_path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or_default()
+                .to_string(),
+            file_path: file_path.display().to_string(),
+            html,
+        }))
+    }
 }
 
 fn normalize_path(value: Option<String>) -> Option<String> {
@@ -271,6 +327,54 @@ fn find_review_result_file(folder: &Path, pull_request_id: i64) -> Result<Option
             .unwrap_or_default()
     });
     Ok(matches.into_iter().next())
+}
+
+fn find_work_item_result_file(folder: &Path, work_item_id: i64) -> Result<Option<PathBuf>> {
+    let mut matches = Vec::new();
+    for entry in fs::read_dir(folder)? {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_file() || !is_html_file(&path) {
+            continue;
+        }
+        let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
+            continue;
+        };
+        if file_name_matches_work_item(file_name, work_item_id) {
+            matches.push(path);
+        }
+    }
+
+    matches.sort_by_key(|path| {
+        path.file_name()
+            .and_then(|value| value.to_str())
+            .map(|value| value.to_ascii_lowercase())
+            .unwrap_or_default()
+    });
+    Ok(matches.into_iter().next())
+}
+
+/// Unlike `file_name_matches_pr`, this matches on the work item id alone (no
+/// "WIT"/"WI" prefix required) since result files are not guaranteed to carry
+/// one. A match requires the id to appear as a standalone digit run, so id 42
+/// does not match "1042" or "422".
+fn file_name_matches_work_item(file_name: &str, work_item_id: i64) -> bool {
+    let needle = work_item_id.to_string();
+    let bytes = file_name.as_bytes();
+    let mut index = 0;
+
+    while let Some(relative) = file_name[index..].find(needle.as_str()) {
+        let start = index + relative;
+        let end = start + needle.len();
+        let before_is_digit = start > 0 && bytes[start - 1].is_ascii_digit();
+        let after_is_digit = bytes.get(end).is_some_and(|value| value.is_ascii_digit());
+        if !before_is_digit && !after_is_digit {
+            return true;
+        }
+        index = start + 1;
+    }
+
+    false
 }
 
 fn is_html_file(path: &Path) -> bool {
@@ -328,5 +432,26 @@ mod tests {
 
         let found = find_review_result_file(temp.path(), 42).unwrap().unwrap();
         assert_eq!(found.file_name().unwrap(), "a-PR42.htm");
+    }
+
+    #[test]
+    fn file_name_matches_work_item_on_standalone_digit_run() {
+        assert!(file_name_matches_work_item("WIT1234.html", 1234));
+        assert!(file_name_matches_work_item("1234-result.html", 1234));
+        assert!(file_name_matches_work_item("result-1234.html", 1234));
+        assert!(!file_name_matches_work_item("result-11234.html", 1234));
+        assert!(!file_name_matches_work_item("result-12345.html", 1234));
+        assert!(!file_name_matches_work_item("result-999.html", 1234));
+    }
+
+    #[test]
+    fn find_work_item_result_file_returns_first_matching_html_file() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::write(temp.path().join("notes-1234.txt"), "ignored").unwrap();
+        fs::write(temp.path().join("b-1234.html"), "<html>b</html>").unwrap();
+        fs::write(temp.path().join("a-1234.htm"), "<html>a</html>").unwrap();
+
+        let found = find_work_item_result_file(temp.path(), 1234).unwrap().unwrap();
+        assert_eq!(found.file_name().unwrap(), "a-1234.htm");
     }
 }
