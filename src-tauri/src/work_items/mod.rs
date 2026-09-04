@@ -188,6 +188,19 @@ impl WorkItemService {
             .map(|pr| pr.pull_request_id)
             .collect();
 
+        // A view's WIQL only uses the project it runs against to resolve
+        // macros such as @project; results can still span the organization.
+        // Map each row back to the project it names so the Project column,
+        // its web link, and follow-up commands address the right project.
+        let projects_by_name: HashMap<String, (String, String)> = self
+            .projects
+            .list(&client, &organization.id)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|p| (p.name.to_lowercase(), (p.id, p.name)))
+            .collect();
+
         // Preserve the query's row order (tree order for link queries).
         let mut items_by_id: HashMap<i64, WorkItem> = work_items
             .into_iter()
@@ -203,8 +216,22 @@ impl WorkItemService {
                     .and_then(|depth_by_id| depth_by_id.get(&work_item.id).copied());
                 let has_active_pull_request =
                     work_item_has_active_pull_request(&work_item.relations, &active_pr_ids);
-                let mut summary =
-                    summarize_work_item(&organization, &project.id, &project.name, work_item);
+                let (item_project_id, item_project_name) =
+                    match string_field(&work_item, "System.TeamProject") {
+                        Some(name) => projects_by_name
+                            .get(&name.to_lowercase())
+                            .cloned()
+                            // An unknown name still beats the query's project
+                            // for display; the id has no better fallback.
+                            .unwrap_or_else(|| (project.id.clone(), name)),
+                        None => (project.id.clone(), project.name.clone()),
+                    };
+                let mut summary = summarize_work_item(
+                    &organization,
+                    &item_project_id,
+                    &item_project_name,
+                    work_item,
+                );
                 summary.extra_fields = extra;
                 summary.depth = depth;
                 summary.has_active_pull_request = has_active_pull_request;

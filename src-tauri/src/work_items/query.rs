@@ -14,6 +14,9 @@ pub(crate) const WORK_ITEM_FIELDS: &[&str] = &[
     "System.AssignedTo",
     "System.ChangedDate",
     "System.Tags",
+    // A view's WIQL is not implicitly scoped to the project it runs against,
+    // so each row carries the project it actually belongs to.
+    "System.TeamProject",
 ];
 
 pub(crate) const WORK_ITEM_PREVIEW_FIELDS: &[&str] = &[
