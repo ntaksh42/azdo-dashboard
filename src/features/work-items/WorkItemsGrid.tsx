@@ -52,6 +52,7 @@ export function WorkItemsGrid({
   storageKeyScope,
   triageScope,
   snoozeOrganizationId,
+  isActivePanel = true,
 }: {
   results: WorkItemSummary[];
   loading: boolean;
@@ -69,6 +70,10 @@ export function WorkItemsGrid({
   storageKeyScope?: string;
   triageScope?: string;
   snoozeOrganizationId?: string;
+  /** Ignore the global `azdodeck:work-items:*` command events while another
+   * docked work-item panel (Work Items search / My Work Items / a saved
+   * view) is the one actually in focus. */
+  isActivePanel?: boolean;
 }) {
   const state = useWiGridState({
     storageKeyScope,
@@ -193,6 +198,7 @@ export function WorkItemsGrid({
       previewLoading={g.previewQuery.isFetching}
       selectedItem={g.selectedItem}
       onPreviewUpdated={g.handlePreviewUpdated}
+      isActivePanel={isActivePanel}
       onDuplicate={(draft) =>
         setDuplicateDraft({
           projectId: draft.projectId,

@@ -7,6 +7,7 @@ import {
   type DockviewApi,
   type DockviewReadyEvent,
   type IDockviewPanelProps,
+  type IWatermarkPanelProps,
   type SerializedDockview,
 } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
@@ -85,6 +86,31 @@ function PanelContent({ api, params }: IDockviewPanelProps<PanelContentParams>) 
 
 const PANEL_COMPONENTS = { content: PanelContent };
 
+// Shown when the user closes every docked view. Reopens the default landing
+// view rather than leaving a blank pane with no way back in without the
+// sidebar (which stays reachable, but this is friendlier than empty space).
+function DockWatermark({ containerApi }: IWatermarkPanelProps) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+      <p>All views are closed.</p>
+      <button
+        type="button"
+        onClick={() =>
+          containerApi.addPanel<PanelContentParams>({
+            id: "myReviews",
+            component: "content",
+            title: VIEW_TITLES.myReviews,
+            params: { content: null },
+          })
+        }
+        className="rounded-md border border-border px-3 py-1.5 hover:bg-secondary"
+      >
+        Open My Reviews
+      </button>
+    </div>
+  );
+}
+
 export interface AppContentProps {
   activeView: View;
   onActiveViewChange: (view: View) => void;
@@ -134,10 +160,11 @@ function renderViewContent(view: View, props: AppContentProps): ReactNode {
         <WorkItemSearch
           externalSearch={props.workItemSearchRequest}
           onExternalSearchHandled={props.onWorkItemSearchHandled}
+          isActivePanel={props.activeView === view}
         />
       );
     case "myWorkItems":
-      return <MyWorkItemsPanel />;
+      return <MyWorkItemsPanel isActivePanel={props.activeView === view} />;
     case "workItemViews":
       return (
         <WorkItemViewsPanel
@@ -145,6 +172,7 @@ function renderViewContent(view: View, props: AppContentProps): ReactNode {
           onSelectedViewChange={props.onSelectedViewChange}
           onSelectedViewRequestHandled={props.onSelectedViewRequestHandled}
           onViewsChange={props.onWorkItemNavViewsChange}
+          isActivePanel={props.activeView === view}
         />
       );
     case "commits":
@@ -260,10 +288,22 @@ export function AppContent(props: AppContentProps) {
       });
       api.onDidActivePanelChange((activePanelEvent) => {
         const view = activePanelEvent.panel?.id as View | undefined;
-        if (!view || view === lastKnownActiveRef.current) return;
+        if (!view) {
+          // Every panel was closed; let the next open of this same view (via
+          // the sidebar or the empty-dock watermark) re-trigger the sync
+          // below instead of being swallowed as a no-op "already active".
+          lastKnownActiveRef.current = null;
+          return;
+        }
+        if (view === lastKnownActiveRef.current) return;
         lastKnownActiveRef.current = view;
         onActiveViewChange(view);
       });
+      // Content is normally pushed by the effect below whenever `activeView`
+      // changes, but a panel added directly through `containerApi` (the
+      // empty-dock watermark's button) doesn't go through that path, so sync
+      // unconditionally whenever a panel is added.
+      api.onDidAddPanel(() => syncPanelContent());
     },
     // Mount-only setup; `activeView` here is only the initial value, later
     // changes are handled by the effect below.
@@ -317,6 +357,7 @@ export function AppContent(props: AppContentProps) {
         defaultRenderer="onlyWhenVisible"
         onReady={onReady}
         theme={dark ? themeDark : themeVisualStudio}
+        watermarkComponent={DockWatermark}
       />
     </section>
   );

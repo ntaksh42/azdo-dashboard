@@ -232,7 +232,7 @@ export function useCommandActions({
     {
       group: "General",
       id: "general.resetLayoutWidths",
-      keywords: ["layout", "width", "sidebar", "preview", "column", "reset", "default"],
+      keywords: ["layout", "width", "sidebar", "preview", "column", "reset", "default", "dock", "panel", "tab"],
       label: "Reset layout widths",
       run: resetLayoutWidths,
     },
