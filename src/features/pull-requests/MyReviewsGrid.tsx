@@ -1,11 +1,10 @@
-import { type CSSProperties } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { commandErrorMessage } from '@/lib/azdoCommands';
 import { isEditableTarget, focusPrimaryPreview, markdownLink } from '@/lib/utils';
 import { SnoozeMenu } from '@/components/SnoozeMenu';
 import { SnoozedItemsPanel } from '@/components/SnoozedItemsPanel';
 import { ColumnResizeHandle } from '@/components/ResizeHandle';
-import { ResizeHandle } from '@/components/ResizeHandle';
+import { DockableSplit } from '@/components/DockableSplit';
 import { ColumnVisibilityMenu } from '@/components/ColumnVisibilityMenu';
 import { ColumnFilterDropdown } from '@/components/ColumnFilterDropdown';
 import { SortHeaderButton } from '@/components/SortHeaderButton';
@@ -19,7 +18,16 @@ import { ReviewFilterBar } from './ReviewFilterBar';
 import { ReviewStatusBar } from './ReviewStatusBar';
 import { OverlapPopup } from './OverlapPopup';
 import { reviewTriageKey, reviewTriageSnapshot } from './myReviewsHelpers';
-import { isFilterableColumn, sortLabels, PR_GRID_KEYS, PR_GRID_REQUIRED_COLUMNS, MIN_REVIEW_PREVIEW_WIDTH } from './myReviewsTypes';
+import {
+  DEFAULT_REVIEW_PREVIEW_WIDTH,
+  isFilterableColumn,
+  MAX_REVIEW_PREVIEW_WIDTH,
+  MIN_REVIEW_PREVIEW_WIDTH,
+  PR_GRID_KEYS,
+  PR_GRID_REQUIRED_COLUMNS,
+  REVIEW_PREVIEW_WIDTH_STORAGE_KEY,
+  sortLabels,
+} from './myReviewsTypes';
 import { useMyReviewsGrid } from './useMyReviewsGrid';
 import type { MyReviewsGridProps } from './myReviewsTypes';
 
@@ -219,17 +227,12 @@ export function MyReviewsGrid({
         onShowDraftsChange={(checked) => { g.setShowDrafts(checked); g.setSelectedIndex(0); }}
         filterSuggestionPool={g.filterSuggestionPool}
       />
-      <div
-        className={
-          g.maximized
-            ? 'flex min-h-0 flex-1'
-            : 'grid min-h-0 flex-1 items-stretch gap-3 xl:grid-cols-[minmax(0,1fr)_8px_minmax(280px,var(--review-preview-width))]'
-        }
-        style={{ '--review-preview-width': `${g.previewWidth}px` } as CSSProperties}
-      >
-        <div
-          className={`flex min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card ${g.maximized ? 'hidden' : ''}`}
-        >
+      <DockableSplit
+        storageKey={`${REVIEW_PREVIEW_WIDTH_STORAGE_KEY}:dockview:v1`}
+        gridTitle="Reviews"
+        previewTitle="Preview"
+        grid={(
+        <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-card">
           {g.showSnoozed ? (
             <SnoozedItemsPanel
               organizationId={g.organizationId}
@@ -345,22 +348,19 @@ export function MyReviewsGrid({
             }}
           />
         </div>
-        <ResizeHandle
-          ariaLabel="Resize review preview"
-          className={g.maximized ? 'hidden' : 'hidden xl:flex'}
-          direction={-1}
-          max={g.previewMaxWidth}
-          min={MIN_REVIEW_PREVIEW_WIDTH}
-          onChange={g.setPreviewWidth}
-          onReset={g.resetPreviewWidth}
-          value={g.previewWidth}
-        />
-        <PrReviewPanel
-          selectedPr={g.selectedPr}
-          maximized={g.maximized}
-          onToggleMaximize={() => g.setMaximized((v) => !v)}
-        />
-      </div>
+        )}
+        preview={(
+          <PrReviewPanel
+            selectedPr={g.selectedPr}
+            maximized={g.maximized}
+            onToggleMaximize={() => g.setMaximized((v) => !v)}
+          />
+        )}
+        defaultPreviewWidth={DEFAULT_REVIEW_PREVIEW_WIDTH}
+        minPreviewWidth={MIN_REVIEW_PREVIEW_WIDTH}
+        maxPreviewWidth={MAX_REVIEW_PREVIEW_WIDTH}
+        maximized={g.maximized}
+      />
       {g.openFilterCol && g.filterAnchorRect ? (
         <ColumnFilterDropdown
           anchorRect={g.filterAnchorRect}

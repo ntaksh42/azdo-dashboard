@@ -1,5 +1,4 @@
 import {
-  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   useEffect,
   useMemo,
@@ -18,7 +17,8 @@ import { openExternalUrl } from "@/lib/openExternal";
 import { useGridColumns } from "@/lib/useGridColumns";
 import { useRangeSelection } from "@/lib/useRangeSelection";
 import { copyRowUrls } from "@/lib/copyUrls";
-import { ColumnResizeHandle, ResizeHandle } from "@/components/ResizeHandle";
+import { ColumnResizeHandle } from "@/components/ResizeHandle";
+import { DockableSplit } from "@/components/DockableSplit";
 import { ColumnVisibilityMenu } from "@/components/ColumnVisibilityMenu";
 import { ActiveFilters } from "@/components/ActiveFilters";
 import { LoadingState } from "@/components/StateDisplay";
@@ -51,7 +51,6 @@ import {
 import { CommitSortHeaderButton } from "./CommitGridRow";
 import { MemoCommitRow } from "./MemoCommitRow";
 import { CommitPreviewPanel } from "./CommitPreviewPanel";
-import { useAdaptivePreviewWidth } from "@/lib/useAdaptivePreviewWidth";
 
 export function CommitResults({
   activeExternalFilterCount = 0,
@@ -98,12 +97,6 @@ export function CommitResults({
   const [columnMenuRect, setColumnMenuRect] = useState<DOMRect | null>(null);
   const [copyToast, setCopyToast] = useState<string | null>(null);
   const [maximized, setMaximized] = useState(false);
-  const previewLayout = useAdaptivePreviewWidth({
-    defaultWidth: DEFAULT_COMMIT_PREVIEW_WIDTH,
-    maxPreviewWidth: MAX_COMMIT_PREVIEW_WIDTH,
-    minPreviewWidth: MIN_COMMIT_PREVIEW_WIDTH,
-    storageKey: `${COMMIT_PREVIEW_WIDTH_STORAGE_KEY}:ratio`,
-  });
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const restoreFocusRef = useRef(false);
   const [scrollerEl, setScrollerEl] = useState<HTMLDivElement | null>(null);
@@ -302,21 +295,8 @@ export function CommitResults({
 
   const selectedCommit = sorted[selectedIndex] ?? null;
 
-  return (
-    <div
-      ref={previewLayout.containerRef}
-      className={
-        maximized
-          ? "flex min-h-0 flex-1"
-          : "grid min-h-0 flex-1 items-stretch gap-3 xl:grid-cols-[minmax(0,1fr)_8px_minmax(320px,var(--commit-preview-width))]"
-      }
-      style={{ "--commit-preview-width": `${previewLayout.width}px` } as CSSProperties}
-    >
-      <div
-        className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-card ${
-          maximized ? "hidden" : ""
-        }`}
-      >
+  const gridPane = (
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-card">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <h2 className="text-base font-semibold">Results</h2>
         <span className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -440,23 +420,29 @@ export function CommitResults({
         </div>
       ) : null}
       </div>
+  );
 
-      <ResizeHandle
-        ariaLabel="Resize commit preview"
-        className={maximized ? "hidden" : "hidden xl:flex"}
-        direction={-1}
-        max={previewLayout.max}
-        min={MIN_COMMIT_PREVIEW_WIDTH}
-        onChange={previewLayout.setWidth}
-        onReset={previewLayout.resetWidth}
-        value={previewLayout.width}
-      />
-
+  const previewPane = (
       <CommitPreviewPanel
         commit={selectedCommit}
         maximized={maximized}
         onToggleMaximize={() => setMaximized((value) => !value)}
         onOpenPullRequest={onOpenPullRequest}
+      />
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <DockableSplit
+        storageKey={`${COMMIT_PREVIEW_WIDTH_STORAGE_KEY}:dockview:v1`}
+        gridTitle="Results"
+        previewTitle="Preview"
+        grid={gridPane}
+        preview={previewPane}
+        defaultPreviewWidth={DEFAULT_COMMIT_PREVIEW_WIDTH}
+        minPreviewWidth={MIN_COMMIT_PREVIEW_WIDTH}
+        maxPreviewWidth={MAX_COMMIT_PREVIEW_WIDTH}
+        maximized={maximized}
       />
 
       {/* Always in DOM so aria-live fires correctly when content changes. */}
