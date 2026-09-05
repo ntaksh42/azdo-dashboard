@@ -100,8 +100,27 @@ export function focusWorkItemCommentInput(): boolean {
   return true;
 }
 
+// The dockable app layout can keep more than one view panel mounted at once
+// (docked side by side, or an inactive tab dockview hasn't unmounted yet), so
+// a bare `document.querySelector` for these app-wide markers could land on the
+// wrong panel. `AppDockLayout` stamps the currently active panel's container
+// with this marker; scope the search to it first, falling back to an unscoped
+// search for contexts with no such wrapper (standalone component tests, or
+// screens like Settings that never sit inside a dockview panel).
+const ACTIVE_VIEW_PANEL_SELECTOR = "[data-active-view-panel='true']";
+
+function queryInActivePanel<T extends Element>(selector: string): T | null {
+  // Each comma-separated alternative needs its own scope prefix -- prefixing
+  // only the whole string would scope just the first alternative.
+  const scoped = selector
+    .split(",")
+    .map((part) => `${ACTIVE_VIEW_PANEL_SELECTOR} ${part.trim()}`)
+    .join(", ");
+  return document.querySelector<T>(scoped) ?? document.querySelector<T>(selector);
+}
+
 export function focusPrimaryGrid(): boolean {
-  const grid = document.querySelector<HTMLElement>("[data-primary-grid='true']");
+  const grid = queryInActivePanel<HTMLElement>("[data-primary-grid='true']");
   if (!grid) return false;
   const selectedRow = grid.querySelector<HTMLElement>("[role='row'][aria-selected='true']");
   const focusTarget =
@@ -111,7 +130,7 @@ export function focusPrimaryGrid(): boolean {
 }
 
 export function focusPrimaryPreview(): boolean {
-  const preview = document.querySelector<HTMLElement>("[data-primary-preview='true']");
+  const preview = queryInActivePanel<HTMLElement>("[data-primary-preview='true']");
   if (!preview) return false;
   preview.focus();
   return true;
@@ -120,14 +139,14 @@ export function focusPrimaryPreview(): boolean {
 // Focuses the active view's main filter/search input (shared by Ctrl+F and the
 // per-grid "/" shortcut so they target the same field everywhere).
 export function focusFilterInput(): boolean {
-  const input = document.querySelector<HTMLInputElement>(
+  const input = queryInActivePanel<HTMLInputElement>(
     [
       "[data-filter-input='true']",
       "input[aria-label='Filter']",
       "input[type='search']",
       "input[placeholder*='Filter']",
       "input[placeholder*='Search']",
-    ].join(","),
+    ].join(", "),
   );
   if (!input || input.disabled || input.hidden) return false;
   input.focus();
@@ -136,7 +155,7 @@ export function focusFilterInput(): boolean {
 }
 
 export function focusViewsPanel(): boolean {
-  const panel = document.querySelector<HTMLElement>("[data-views-panel='true']");
+  const panel = queryInActivePanel<HTMLElement>("[data-views-panel='true']");
   if (!panel) return false;
   const firstButton = panel.querySelector<HTMLElement>("button[role='option']");
   if (firstButton) {

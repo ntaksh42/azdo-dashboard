@@ -13,7 +13,7 @@ import {
 import "dockview-react/dist/styles/dockview.css";
 import { ResizeHandle } from "@/components/ResizeHandle";
 import { readStoredJson, writeStoredJson } from "@/lib/storage";
-import { THEME_CHANGED_EVENT, watchSystemTheme } from "@/lib/theme";
+import { useIsDarkMode } from "@/lib/useIsDarkMode";
 
 const GRID_PANEL_ID = "grid";
 const PREVIEW_PANEL_ID = "preview";
@@ -59,24 +59,6 @@ function createPreviewResizeAction(options: { min: number; max: number; defaultW
       />
     );
   };
-}
-
-function isDarkMode(): boolean {
-  return document.documentElement.classList.contains("dark");
-}
-
-function useIsDarkMode(): boolean {
-  const [dark, setDark] = useState(isDarkMode);
-  useEffect(() => {
-    const update = () => setDark(isDarkMode());
-    window.addEventListener(THEME_CHANGED_EVENT, update);
-    const unwatch = watchSystemTheme(update);
-    return () => {
-      window.removeEventListener(THEME_CHANGED_EVENT, update);
-      unwatch();
-    };
-  }, []);
-  return dark;
 }
 
 /**
@@ -179,7 +161,19 @@ export function DockableSplit({
       // panel-level equivalent depends on a ResizeObserver on its content
       // element, which won't fire in a test environment without real DOM
       // measurement).
-      const persist = () => writeStoredJson(storageKey, api.toJSON());
+      //
+      // `toJSON()` embeds each panel's `params`, which is the React element
+      // passed as `content` -- that survives one JSON round-trip as a plain
+      // object (not a real element), so restoring it later would crash
+      // React. Strip params before persisting; `grid`/`preview` are always
+      // re-supplied via `updateParameters` on restore anyway.
+      const persist = () => {
+        const layout = api.toJSON();
+        for (const panel of Object.values(layout.panels)) {
+          panel.params = undefined;
+        }
+        writeStoredJson(storageKey, layout);
+      };
       api.onDidLayoutChange(persist);
       api.getPanel(GRID_PANEL_ID)?.api.group.api.onDidDimensionsChange(persist);
       api.getPanel(PREVIEW_PANEL_ID)?.api.group.api.onDidDimensionsChange(persist);
