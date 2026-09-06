@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { DockableWorkspace, type DockablePanelSpec } from "./DockableWorkspace";
 
 // jsdom reports 0 for every layout dimension, so dockview would clamp every
@@ -14,6 +14,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   document.documentElement.classList.remove("dark");
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -83,15 +84,32 @@ describe("DockableWorkspace", () => {
   });
 
   it("resizes a panel from the keyboard and persists the layout", () => {
+    vi.useFakeTimers();
     const storageKey = "test:dockable-workspace:persist";
     const resize = renderWorkspace(storageKey);
 
     fireEvent.keyDown(resize, { key: "ArrowLeft" });
     expect(resize.getAttribute("aria-valuenow")).toBe("436");
+    act(() => vi.advanceTimersByTime(100));
     expect(window.localStorage.getItem(`${storageKey}:schema:v3`)).toBeTruthy();
 
     fireEvent.doubleClick(resize);
     expect(resize.getAttribute("aria-valuenow")).toBe("420");
+  });
+
+  it("coalesces repeated resize events into one persisted layout", () => {
+    vi.useFakeTimers();
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    const resize = renderWorkspace("test:dockable-workspace:debounced-persist");
+    setItem.mockClear();
+
+    fireEvent.keyDown(resize, { key: "ArrowLeft" });
+    fireEvent.keyDown(resize, { key: "ArrowLeft" });
+    fireEvent.keyDown(resize, { key: "ArrowLeft" });
+
+    expect(setItem).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(100));
+    expect(setItem).toHaveBeenCalledTimes(1);
   });
 
   it("reflects updated panel content on rerender", () => {
@@ -146,12 +164,14 @@ describe("DockableWorkspace", () => {
   });
 
   it("restores a previously persisted width across a remount", () => {
+    vi.useFakeTimers();
     const storageKey = "test:dockable-workspace:restore";
     const { unmount } = render(<DockableWorkspace storageKey={storageKey} panels={twoPanels()} />);
     fireEvent.keyDown(screen.getByRole("separator", { name: "Resize Preview" }), { key: "ArrowLeft" });
     expect(screen.getByRole("separator", { name: "Resize Preview" }).getAttribute("aria-valuenow")).toBe(
       "436",
     );
+    act(() => vi.advanceTimersByTime(100));
     expect(window.localStorage.getItem(`${storageKey}:schema:v3`)).toBeTruthy();
     unmount();
 
@@ -162,12 +182,14 @@ describe("DockableWorkspace", () => {
   });
 
   it("ignores layouts saved before the current layout schema", () => {
+    vi.useFakeTimers();
     const fixtureKey = "test:dockable-workspace:legacy-fixture";
     const storageKey = "test:dockable-workspace:legacy";
     const { unmount } = render(<DockableWorkspace storageKey={fixtureKey} panels={twoPanels()} />);
     fireEvent.keyDown(screen.getByRole("separator", { name: "Resize Preview" }), {
       key: "ArrowLeft",
     });
+    act(() => vi.advanceTimersByTime(100));
     const legacyLayout = window.localStorage.getItem(`${fixtureKey}:schema:v3`);
     expect(legacyLayout).toBeTruthy();
     unmount();

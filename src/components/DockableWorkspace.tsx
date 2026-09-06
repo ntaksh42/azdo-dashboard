@@ -123,6 +123,7 @@ export function DockableWorkspace({
 }) {
   const apiRef = useRef<DockviewApi | null>(null);
   const dockviewElementRef = useRef<HTMLDivElement | null>(null);
+  const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dark = useIsDarkMode();
   const layoutStorageKey = `${storageKey}${LAYOUT_SCHEMA_SUFFIX}`;
   const panelsRef = useRef(panels);
@@ -253,9 +254,16 @@ export function DockableWorkspace({
           console.error(`DockableWorkspace(${storageKey}): failed to persist layout`, error);
         }
       };
-      api.onDidLayoutChange(persist);
+      const schedulePersist = () => {
+        if (persistTimeoutRef.current !== null) clearTimeout(persistTimeoutRef.current);
+        persistTimeoutRef.current = setTimeout(() => {
+          persistTimeoutRef.current = null;
+          persist();
+        }, 100);
+      };
+      api.onDidLayoutChange(schedulePersist);
       for (const spec of initialPanels) {
-        api.getPanel(spec.id)?.api.group.api.onDidDimensionsChange(persist);
+        api.getPanel(spec.id)?.api.group.api.onDidDimensionsChange(schedulePersist);
       }
     },
     // Mount-only: dockview calls onReady exactly once when the instance is
@@ -268,6 +276,10 @@ export function DockableWorkspace({
   useEffect(() => {
     syncPanelContent();
   });
+
+  useEffect(() => () => {
+    if (persistTimeoutRef.current !== null) clearTimeout(persistTimeoutRef.current);
+  }, []);
 
   useEffect(() => {
     const api = apiRef.current;
