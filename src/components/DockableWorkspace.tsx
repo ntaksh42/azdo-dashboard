@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  ArrowDownToLine,
+  ArrowLeftToLine,
+  ArrowRightToLine,
+  ArrowUpToLine,
+  Move,
+  PanelsTopLeft,
+} from "lucide-react";
+import {
   DockviewReact,
   DockviewDefaultTab,
   themeDark,
@@ -7,6 +15,7 @@ import {
   type DockviewApi,
   type DockviewReadyEvent,
   type IDockviewHeaderActionsProps,
+  type IDockviewPanel,
   type IDockviewPanelProps,
   type SerializedDockview,
 } from "dockview-react";
@@ -52,17 +61,161 @@ function PanelContent(props: IDockviewPanelProps<PanelContentParams>) {
 const PANEL_COMPONENTS = { content: PanelContent };
 const LAYOUT_SCHEMA_SUFFIX = ":schema:v3";
 
+const MOVE_DIRECTIONS: {
+  direction: "left" | "right" | "above" | "below" | "within";
+  label: string;
+  Icon: typeof ArrowLeftToLine;
+}[] = [
+  { direction: "left", label: "Split left of", Icon: ArrowLeftToLine },
+  { direction: "right", label: "Split right of", Icon: ArrowRightToLine },
+  { direction: "above", label: "Split above", Icon: ArrowUpToLine },
+  { direction: "below", label: "Split below", Icon: ArrowDownToLine },
+  { direction: "within", label: "Tab with", Icon: PanelsTopLeft },
+];
+
 /**
- * dockview's own resize sash is pointer-drag only (no keyboard path). This
- * renders a keyboard-operable resize control (same semantics as the app's
- * other split panes) into the header actions of any panel that was given a
- * `minWidth`/`maxWidth` -- i.e. every panel except the anchor.
+ * dockview's own drag-and-drop is the only built-in way to move a panel to a
+ * new split or tab group, and its keyboard-driven equivalent ("KeyboardDocking")
+ * is a dockview-enterprise module we don't have -- so without this menu,
+ * repositioning a panel is mouse-only, which fails this app's keyboard-operability
+ * requirement outright. Moving is implemented as `removePanel` + `addPanel` at
+ * the new position (both public, free-tier APIs); dockview has no public
+ * "move an existing panel" call.
  */
-function createPanelResizeAction(
-  specs: Map<string, { min: number; max: number; defaultWidth: number; title: string }>,
+function PanelMoveMenu({
+  panel,
+  containerApi,
+  panelsRef,
+}: {
+  panel: IDockviewPanel;
+  containerApi: DockviewApi;
+  panelsRef: { current: DockablePanelSpec[] };
+}) {
+  const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onMouseDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (!menuRef.current?.contains(target) && target !== buttonRef.current) setOpen(false);
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [open]);
+
+  function moveFocus(delta: number) {
+    const items = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+    if (items.length === 0) return;
+    const current = items.indexOf(document.activeElement as HTMLElement);
+    items[(current + delta + items.length) % items.length]?.focus();
+  }
+
+  function handleMenuKeyDown(event: React.KeyboardEvent) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+      buttonRef.current?.focus();
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      moveFocus(1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      moveFocus(-1);
+    }
+  }
+
+  function move(targetId: string, direction: (typeof MOVE_DIRECTIONS)[number]["direction"]) {
+    const spec = panelsRef.current.find((entry) => entry.id === panel.id);
+    if (!spec) return;
+    containerApi.removePanel(panel);
+    containerApi.addPanel<PanelContentParams>({
+      id: spec.id,
+      component: "content",
+      title: spec.title,
+      params: { content: spec.content },
+      minimumWidth: spec.minWidth,
+      maximumWidth: spec.maxWidth,
+      position: { referencePanel: targetId, direction },
+      initialWidth: spec.initialWidth,
+    });
+    setOpen(false);
+    buttonRef.current?.focus();
+  }
+
+  const targets = containerApi.panels.filter((candidate) => candidate.id !== panel.id);
+  if (targets.length === 0) return null;
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Move ${panel.title ?? panel.id} panel`}
+        title="Move panel"
+        onClick={() => setOpen((value) => !value)}
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-secondary hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        <Move className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+      {open ? (
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label={`Move ${panel.title ?? panel.id}`}
+          onKeyDown={handleMenuKeyDown}
+          className="absolute right-0 top-full z-50 mt-1 max-h-80 w-64 overflow-y-auto rounded-md border border-border bg-popover p-1 text-xs shadow-lg"
+        >
+          {targets.map((target) => {
+            const title = panelsRef.current.find((entry) => entry.id === target.id)?.title ?? target.id;
+            return (
+              <div key={target.id} className="mb-1 border-b border-border pb-1 last:mb-0 last:border-0">
+                <div className="truncate px-2 py-0.5 font-semibold text-muted-foreground">{title}</div>
+                <div className="grid grid-cols-5 gap-0.5 px-1">
+                  {MOVE_DIRECTIONS.map(({ direction, label, Icon }) => (
+                    <button
+                      key={direction}
+                      role="menuitem"
+                      type="button"
+                      aria-label={`${label} ${title}`}
+                      title={`${label} ${title}`}
+                      onClick={() => move(target.id, direction)}
+                      className="flex items-center justify-center rounded p-1 hover:bg-secondary focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      <Icon className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Combines the keyboard-accessible move menu and resize handle into one
+ * `rightHeaderActionsComponent`. The move menu shows for any group's active
+ * panel; the resize handle only for panels with size constraints (i.e. every
+ * panel but the anchor).
+ */
+function createHeaderActions(
+  resizeSpecs: Map<string, { min: number; max: number; defaultWidth: number; title: string }>,
+  panelsRef: { current: DockablePanelSpec[] },
 ) {
-  return function PanelResizeAction({ api, group }: IDockviewHeaderActionsProps) {
-    const resizablePanel = group.panels.find((panel) => specs.has(panel.id));
+  return function HeaderActions({ api, group, containerApi, activePanel }: IDockviewHeaderActionsProps) {
+    const resizablePanel = group.panels.find((panel) => resizeSpecs.has(panel.id));
     const [width, setWidth] = useState(() => api.width);
 
     useEffect(() => {
@@ -70,21 +223,26 @@ function createPanelResizeAction(
       return () => disposable.dispose();
     }, [api]);
 
-    if (!resizablePanel) return null;
-    const spec = specs.get(resizablePanel.id);
-    if (!spec) return null;
+    const resizeSpec = resizablePanel ? resizeSpecs.get(resizablePanel.id) : undefined;
 
     return (
-      <ResizeHandle
-        ariaLabel={`Resize ${spec.title}`}
-        direction={-1}
-        min={spec.min}
-        max={spec.max}
-        value={width}
-        onChange={(next) => api.setSize({ width: next })}
-        onReset={() => api.setSize({ width: spec.defaultWidth })}
-        className="flex h-5 w-4 shrink-0"
-      />
+      <div className="flex h-full items-center gap-0.5 pr-0.5">
+        {activePanel ? (
+          <PanelMoveMenu panel={activePanel} containerApi={containerApi} panelsRef={panelsRef} />
+        ) : null}
+        {resizeSpec ? (
+          <ResizeHandle
+            ariaLabel={`Resize ${resizeSpec.title}`}
+            direction={-1}
+            min={resizeSpec.min}
+            max={resizeSpec.max}
+            value={width}
+            onChange={(next) => api.setSize({ width: next })}
+            onReset={() => api.setSize({ width: resizeSpec.defaultWidth })}
+            className="flex h-5 w-4 shrink-0"
+          />
+        ) : null}
+      </div>
     );
   };
 }
@@ -132,7 +290,7 @@ export function DockableWorkspace({
   // Frozen at first render: dockview reads `rightHeaderActionsComponent` only
   // once, at mount, the same as `onReady` below.
   const rightHeaderActionsComponent = useRef(
-    createPanelResizeAction(
+    createHeaderActions(
       new Map(
         panels
           .filter((panel) => panel.position && panel.minWidth !== undefined && panel.maxWidth !== undefined)
@@ -146,6 +304,7 @@ export function DockableWorkspace({
             },
           ]),
       ),
+      panelsRef,
     ),
   ).current;
 

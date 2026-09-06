@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { DockableWorkspace, type DockablePanelSpec } from "./DockableWorkspace";
 
 // jsdom reports 0 for every layout dimension, so dockview would clamp every
@@ -253,5 +253,100 @@ describe("DockableWorkspace", () => {
     expect(resultResize.getAttribute("aria-valuenow")).toBe("336");
     // Resizing Result does not disturb Preview's own reported width.
     expect(previewResize.getAttribute("aria-valuenow")).toBe("280");
+  });
+
+  describe("move menu", () => {
+    function threePanels(): DockablePanelSpec[] {
+      return [
+        { id: "grid", title: "Grid", content: <div>grid content</div>, minWidth: 480 },
+        {
+          id: "preview",
+          title: "Preview",
+          content: <div>preview content</div>,
+          position: { relativeTo: "grid", direction: "right" },
+          initialWidth: 420,
+          minWidth: 280,
+          maxWidth: 8192,
+        },
+        {
+          id: "result",
+          title: "Result",
+          content: <div>result content</div>,
+          position: { relativeTo: "preview", direction: "right" },
+          initialWidth: 320,
+          minWidth: 200,
+          maxWidth: 8192,
+        },
+      ];
+    }
+
+    // dockview's drag-and-drop is the only built-in way to reposition a
+    // panel, and its keyboard equivalent is a dockview-enterprise module this
+    // app doesn't have -- so this menu is the only keyboard path to move a
+    // panel at all. These tests exercise it end to end rather than just the
+    // UI, since a menu that opens but doesn't actually relocate the panel
+    // would still leave the app keyboard-inoperable for this action.
+    it("moves a panel into another panel's group as a tab", () => {
+      render(<DockableWorkspace storageKey="test:dockable-workspace:move-tab" panels={threePanels()} />);
+
+      expect(screen.getByRole("separator", { name: "Resize Result" })).toBeTruthy();
+      expect(screen.getByText("grid content")).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: "Move Result panel" }));
+      const menu = screen.getByRole("menu", { name: "Move Result" });
+      fireEvent.click(within(menu).getByRole("menuitem", { name: "Tab with Grid" }));
+
+      // Result is now tabbed inside Grid's group instead of its own split --
+      // Preview's separator (unaffected) still reports its own width, Result
+      // is the active tab in the merged group (having just moved in), and
+      // Grid's own content sits behind it, hidden until that tab is picked.
+      expect(screen.getByRole("separator", { name: "Resize Preview" })).toBeTruthy();
+      expect(screen.getByRole("tab", { name: "Result" })).toBeTruthy();
+      expect(screen.getByText("result content")).toBeTruthy();
+      expect(screen.queryByText("grid content")).toBeNull();
+    });
+
+    it("splits a panel into a new position relative to another panel", () => {
+      render(<DockableWorkspace storageKey="test:dockable-workspace:move-split" panels={threePanels()} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Move Result panel" }));
+      fireEvent.click(
+        within(screen.getByRole("menu", { name: "Move Result" })).getByRole("menuitem", {
+          name: "Split below Grid",
+        }),
+      );
+
+      // Still its own split (not merged into another group), so it keeps its
+      // resize handle and its content stays visible without needing a tab
+      // click -- confirming this was a genuine reposition, not a no-op.
+      expect(screen.getByRole("separator", { name: "Resize Result" })).toBeTruthy();
+      expect(screen.getByText("result content")).toBeTruthy();
+    });
+
+    it("closes the move menu on Escape and returns focus to the trigger button", () => {
+      render(<DockableWorkspace storageKey="test:dockable-workspace:move-escape" panels={threePanels()} />);
+
+      const trigger = screen.getByRole("button", { name: "Move Result panel" });
+      fireEvent.click(trigger);
+      const menu = screen.getByRole("menu", { name: "Move Result" });
+
+      fireEvent.keyDown(menu, { key: "Escape" });
+      expect(screen.queryByRole("menu", { name: "Move Result" })).toBeNull();
+      expect(document.activeElement).toBe(trigger);
+    });
+
+    it("navigates the move menu's items with the arrow keys", () => {
+      render(<DockableWorkspace storageKey="test:dockable-workspace:move-arrows" panels={threePanels()} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Move Result panel" }));
+      const menu = screen.getByRole("menu", { name: "Move Result" });
+      const items = within(menu).getAllByRole("menuitem");
+
+      expect(document.activeElement).toBe(items[0]);
+      fireEvent.keyDown(menu, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(items[1]);
+      fireEvent.keyDown(menu, { key: "ArrowUp" });
+      expect(document.activeElement).toBe(items[0]);
+    });
   });
 });
