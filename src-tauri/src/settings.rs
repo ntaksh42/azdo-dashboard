@@ -451,7 +451,9 @@ mod tests {
         fs::write(temp.path().join("b-1234.html"), "<html>b</html>").unwrap();
         fs::write(temp.path().join("a-1234.htm"), "<html>a</html>").unwrap();
 
-        let found = find_work_item_result_file(temp.path(), 1234).unwrap().unwrap();
+        let found = find_work_item_result_file(temp.path(), 1234)
+            .unwrap()
+            .unwrap();
         assert_eq!(found.file_name().unwrap(), "a-1234.htm");
     }
 }
