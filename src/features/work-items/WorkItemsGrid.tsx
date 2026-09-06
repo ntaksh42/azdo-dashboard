@@ -3,9 +3,11 @@ import { commandErrorMessage } from '@/lib/azdoCommands';
 import { CreateWorkItemDialog, type CreateWorkItemDraft } from './CreateWorkItemDialog';
 import { SnoozeMenu } from '@/components/SnoozeMenu';
 import { SnoozedItemsPanel } from '@/components/SnoozedItemsPanel';
-import { DockableSplit } from '@/components/DockableSplit';
+import { DockableWorkspace, type DockablePanelSpec } from '@/components/DockableWorkspace';
 import { ColumnVisibilityMenu } from '@/components/ColumnVisibilityMenu';
+import { PreviewEmptyState } from '@/components/StateDisplay';
 import { WorkItemPreviewPanel } from './WorkItemPreviewPanel';
+import { WorkItemResultSection } from './WorkItemResultSection';
 import { storeCustomPreviewFields } from './previewFieldsStorage';
 import { workItemQueryKeys } from './queryKeys';
 import {
@@ -208,6 +210,14 @@ export function WorkItemsGrid({
     />
   );
 
+  const resultPane = g.selectedItem ? (
+    <WorkItemResultSection workItemId={g.selectedItem.id} />
+  ) : (
+    <div className="flex h-full items-center justify-center p-4">
+      <PreviewEmptyState message="Select a work item to see its investigation result." />
+    </div>
+  );
+
   return (
     <div
       ref={state.containerRef}
@@ -285,15 +295,31 @@ export function WorkItemsGrid({
         />
       ) : null}
       {previewVisible ? (
-        <DockableSplit
+        <DockableWorkspace
           storageKey={`${previewStorageKey}:dockview:v1`}
-          gridTitle="Work items"
-          previewTitle="Preview"
-          grid={gridPane}
-          preview={previewPane}
-          defaultPreviewWidth={DEFAULT_WORK_ITEM_PREVIEW_WIDTH}
-          minPreviewWidth={300}
-          maxPreviewWidth={MAX_WORK_ITEM_PREVIEW_WIDTH}
+          panels={[
+            { id: 'grid', title: 'Work items', content: gridPane, minWidth: 480 },
+            {
+              id: 'preview',
+              title: 'Preview',
+              content: previewPane,
+              position: { relativeTo: 'grid', direction: 'right' },
+              initialWidth: DEFAULT_WORK_ITEM_PREVIEW_WIDTH,
+              minWidth: 300,
+              maxWidth: MAX_WORK_ITEM_PREVIEW_WIDTH,
+            },
+            {
+              // Tabbed together with Preview by default -- the investigation
+              // result is auxiliary content the user can drag into its own
+              // split or floating window, not something that should crowd
+              // the main preview open by default.
+              id: 'result',
+              title: 'Result',
+              content: resultPane,
+              position: { relativeTo: 'preview', direction: 'within' },
+              minWidth: 320,
+            },
+          ] satisfies DockablePanelSpec[]}
         />
       ) : (
         gridPane

@@ -7,10 +7,12 @@ import {
 } from "@/lib/azdoCommands";
 import { openLocalPath } from "@/lib/openExternal";
 import { LoadingState, PreviewEmptyState } from "@/components/StateDisplay";
-import { PreviewSection } from "./PreviewSection";
 
 // Mirrors the PR "Result" tab (PrSecondaryTabs.tsx), matching a locally
-// generated HTML report by work item id instead of PR id.
+// generated HTML report by work item id instead of PR id. Rendered as its own
+// dockable panel (see WorkItemsGrid.tsx) rather than a section embedded in
+// the main preview, so it fills the height it's given instead of a fixed
+// scroll box.
 export function WorkItemResultSection({ workItemId }: { workItemId: number }) {
   const settingsQuery = useQuery({
     queryKey: ["appSettings"],
@@ -33,34 +35,38 @@ export function WorkItemResultSection({ workItemId }: { workItemId: number }) {
     void openLocalPath(preview.filePath);
   }
 
-  if (!hasFolder) return null;
+  if (!hasFolder) {
+    return (
+      <div className="flex h-full items-center justify-center p-4">
+        <PreviewEmptyState message="Set a work item result folder in Settings to see investigation output here." />
+      </div>
+    );
+  }
   if (settingsQuery.isLoading || previewQuery.isLoading) {
     return (
-      <PreviewSection collapseId="reviewResult" title="Review result">
+      <div className="p-3">
         <LoadingState />
-      </PreviewSection>
+      </div>
     );
   }
   if (previewQuery.isError) {
     return (
-      <PreviewSection collapseId="reviewResult" title="Review result">
-        <p className="text-[11px] leading-4 text-destructive">
-          {commandErrorMessage(previewQuery.error)}
-        </p>
-      </PreviewSection>
+      <p className="p-3 text-[11px] leading-4 text-destructive">
+        {commandErrorMessage(previewQuery.error)}
+      </p>
     );
   }
   if (!preview) {
     return (
-      <PreviewSection collapseId="reviewResult" title="Review result">
+      <div className="flex h-full items-center justify-center p-4">
         <PreviewEmptyState message={`No HTML file matched work item ${workItemId}.`} />
-      </PreviewSection>
+      </div>
     );
   }
 
   return (
-    <PreviewSection collapseId="reviewResult" title="Review result">
-      <div className="flex items-center gap-2 pb-1">
+    <div className="flex h-full min-h-0 flex-col gap-2 p-3">
+      <div className="flex shrink-0 items-center gap-2">
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-medium" title={preview.fileName}>
             {preview.fileName}
@@ -86,8 +92,8 @@ export function WorkItemResultSection({ workItemId }: { workItemId: number }) {
         title={`Review result preview for work item ${preview.workItemId}`}
         sandbox="allow-same-origin"
         srcDoc={preview.html}
-        className="h-64 w-full rounded border border-border bg-card outline-none"
+        className="min-h-0 flex-1 rounded border border-border bg-card outline-none"
       />
-    </PreviewSection>
+    </div>
   );
 }

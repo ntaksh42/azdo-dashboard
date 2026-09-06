@@ -9,7 +9,7 @@ import {
   updatePipelineApproval,
 } from "@/lib/azdoCommands";
 import { useActiveOrganizationId } from "@/lib/useActiveConnection";
-import { DockableSplit } from "@/components/DockableSplit";
+import { DockableWorkspace, type DockablePanelSpec } from "@/components/DockableWorkspace";
 import { FilterableSelect } from "./FilterableSelect";
 import { PipelineApprovalsPanel } from "./PipelineApprovalsPanel";
 import { PipelineDefinitionPanel } from "./PipelineDefinitionPanel";
@@ -370,56 +370,65 @@ export function PipelinesView() {
         />
       ) : null}
 
-      <DockableSplit
+      <DockableWorkspace
         storageKey={`${PIPELINE_PREVIEW_WIDTH_STORAGE_KEY}:dockview:v1`}
-        gridTitle="Pipelines"
-        previewTitle="Preview"
-        grid={(
-          <PipelineSubscriptionsBoard
-            organizationId={selectedOrganizationId}
-            subscriptions={subscriptions}
-            selectedBuildId={detailTarget?.buildId ?? null}
-            onSelectRun={(selection) => setDetailTarget(selection)}
-            onRemove={(removeProjectId, removeDefinitionId) => {
-              persistSubscriptions(
-                removeSubscription(
-                  subscriptions,
-                  selectedOrganizationId,
-                  removeProjectId,
-                  removeDefinitionId,
-                ),
-              );
-              // Clear the detail panel only if it is showing a run from the exact
-              // pipeline that was just unwatched, identified by project and
-              // definition (other pipelines in the same project stay shown).
-              if (
-                detailTarget?.projectId === removeProjectId &&
-                detailTarget?.definitionId === removeDefinitionId
-              ) {
-                setDetailTarget(null);
-              }
-            }}
-          />
-        )}
-        preview={
-          detailTarget == null && definitionId != null && selectedDefinition ? (
-            <PipelineDefinitionPanel
-              organizationId={selectedOrganizationId}
-              projectId={projectId}
-              definitionId={definitionId}
-              definitionName={selectedDefinition.name}
-            />
-          ) : (
-            <PipelineRunDetailPanel
-              organizationId={detailTarget?.organizationId ?? selectedOrganizationId}
-              projectId={detailTarget?.projectId ?? projectId}
-              buildId={detailTarget?.buildId ?? null}
-            />
-          )
-        }
-        defaultPreviewWidth={DEFAULT_PIPELINE_PREVIEW_WIDTH}
-        minPreviewWidth={MIN_PIPELINE_PREVIEW_WIDTH}
-        maxPreviewWidth={MAX_PIPELINE_PREVIEW_WIDTH}
+        panels={[
+          {
+            id: "grid",
+            title: "Pipelines",
+            minWidth: 480,
+            content: (
+              <PipelineSubscriptionsBoard
+                organizationId={selectedOrganizationId}
+                subscriptions={subscriptions}
+                selectedBuildId={detailTarget?.buildId ?? null}
+                onSelectRun={(selection) => setDetailTarget(selection)}
+                onRemove={(removeProjectId, removeDefinitionId) => {
+                  persistSubscriptions(
+                    removeSubscription(
+                      subscriptions,
+                      selectedOrganizationId,
+                      removeProjectId,
+                      removeDefinitionId,
+                    ),
+                  );
+                  // Clear the detail panel only if it is showing a run from the exact
+                  // pipeline that was just unwatched, identified by project and
+                  // definition (other pipelines in the same project stay shown).
+                  if (
+                    detailTarget?.projectId === removeProjectId &&
+                    detailTarget?.definitionId === removeDefinitionId
+                  ) {
+                    setDetailTarget(null);
+                  }
+                }}
+              />
+            ),
+          },
+          {
+            id: "preview",
+            title: "Preview",
+            position: { relativeTo: "grid", direction: "right" },
+            initialWidth: DEFAULT_PIPELINE_PREVIEW_WIDTH,
+            minWidth: MIN_PIPELINE_PREVIEW_WIDTH,
+            maxWidth: MAX_PIPELINE_PREVIEW_WIDTH,
+            content:
+              detailTarget == null && definitionId != null && selectedDefinition ? (
+                <PipelineDefinitionPanel
+                  organizationId={selectedOrganizationId}
+                  projectId={projectId}
+                  definitionId={definitionId}
+                  definitionName={selectedDefinition.name}
+                />
+              ) : (
+                <PipelineRunDetailPanel
+                  organizationId={detailTarget?.organizationId ?? selectedOrganizationId}
+                  projectId={detailTarget?.projectId ?? projectId}
+                  buildId={detailTarget?.buildId ?? null}
+                />
+              ),
+          },
+        ] satisfies DockablePanelSpec[]}
       />
 
       {watchToast && (

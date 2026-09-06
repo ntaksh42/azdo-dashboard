@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReviewPullRequestSummary } from "@/lib/azdoCommands";
@@ -8,6 +8,11 @@ import { PrReviewPanel } from "./PrReviewPanel";
 // automatic per-test cleanup isn't registered; unmount explicitly so a prior
 // render's panel doesn't leak into the next test's `screen` queries.
 afterEach(cleanup);
+
+// PrReviewPanel now renders a DockableWorkspace (storageKey "pr-review-panel"),
+// which persists its dockview layout (incl. the active tab) to localStorage;
+// clear it so one test's tab switch does not leak into the next test's render.
+beforeEach(() => window.localStorage.clear());
 
 const pr: ReviewPullRequestSummary = {
   organizationId: "contoso",
@@ -82,7 +87,7 @@ describe("PrReviewPanel Result tab", () => {
         { name: "Result" },
         { timeout: 8000 },
       );
-      fireEvent.click(resultTab);
+      fireEvent.pointerDown(resultTab, { button: 0 });
 
       // Wait for the preview query to resolve and render its iframe.
       const frame = (await screen.findByTitle(

@@ -4,7 +4,7 @@ import { isEditableTarget, focusPrimaryPreview, markdownLink } from '@/lib/utils
 import { SnoozeMenu } from '@/components/SnoozeMenu';
 import { SnoozedItemsPanel } from '@/components/SnoozedItemsPanel';
 import { ColumnResizeHandle } from '@/components/ResizeHandle';
-import { DockableSplit } from '@/components/DockableSplit';
+import { DockableWorkspace, type DockablePanelSpec } from '@/components/DockableWorkspace';
 import { ColumnVisibilityMenu } from '@/components/ColumnVisibilityMenu';
 import { ColumnFilterDropdown } from '@/components/ColumnFilterDropdown';
 import { SortHeaderButton } from '@/components/SortHeaderButton';
@@ -227,11 +227,14 @@ export function MyReviewsGrid({
         onShowDraftsChange={(checked) => { g.setShowDrafts(checked); g.setSelectedIndex(0); }}
         filterSuggestionPool={g.filterSuggestionPool}
       />
-      <DockableSplit
+      <DockableWorkspace
         storageKey={`${REVIEW_PREVIEW_WIDTH_STORAGE_KEY}:dockview:v1`}
-        gridTitle="Reviews"
-        previewTitle="Preview"
-        grid={(
+        panels={[
+          {
+            id: 'grid',
+            title: 'Reviews',
+            minWidth: 480,
+            content: (
         <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-card">
           {g.showSnoozed ? (
             <SnoozedItemsPanel
@@ -348,18 +351,25 @@ export function MyReviewsGrid({
             }}
           />
         </div>
-        )}
-        preview={(
-          <PrReviewPanel
-            selectedPr={g.selectedPr}
-            maximized={g.maximized}
-            onToggleMaximize={() => g.setMaximized((v) => !v)}
-          />
-        )}
-        defaultPreviewWidth={DEFAULT_REVIEW_PREVIEW_WIDTH}
-        minPreviewWidth={MIN_REVIEW_PREVIEW_WIDTH}
-        maxPreviewWidth={MAX_REVIEW_PREVIEW_WIDTH}
-        maximized={g.maximized}
+            ),
+          },
+          {
+            id: 'preview',
+            title: 'Preview',
+            position: { relativeTo: 'grid', direction: 'right' },
+            initialWidth: DEFAULT_REVIEW_PREVIEW_WIDTH,
+            minWidth: MIN_REVIEW_PREVIEW_WIDTH,
+            maxWidth: MAX_REVIEW_PREVIEW_WIDTH,
+            content: (
+              <PrReviewPanel
+                selectedPr={g.selectedPr}
+                maximized={g.maximized}
+                onToggleMaximize={() => g.setMaximized((v) => !v)}
+              />
+            ),
+          },
+        ] satisfies DockablePanelSpec[]}
+        maximizedId={g.maximized ? 'preview' : undefined}
       />
       {g.openFilterCol && g.filterAnchorRect ? (
         <ColumnFilterDropdown

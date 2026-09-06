@@ -191,7 +191,7 @@ describe("App — Reviews", () => {
     // Select that row; the Result tab and Ctrl+Enter then act on it.
     fireEvent.click(main.getByText("Waiting on author"));
 
-    fireEvent.click(main.getByRole("tab", { name: "Result" }));
+    fireEvent.pointerDown(main.getByRole("tab", { name: "Result" }), { button: 0 });
     expect(await main.findByText("review-PR102.html")).toBeTruthy();
 
     // The Result tab opens the local HTML in the browser via a button…

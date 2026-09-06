@@ -27,7 +27,7 @@ describe("App — Layout", () => {
     openPathMock.mockReset();
     writeClipboardTextMock.mockReset();
     window.localStorage.clear();
-    // jsdom reports 0 for every layout dimension. dockview (DockableSplit)
+    // jsdom reports 0 for every layout dimension. dockview (DockableWorkspace)
     // reads clientWidth/Height once at mount to size its grid, so without a
     // real value it clamps every panel straight to its minimum width and
     // reports no size change on manual resize. Give it realistic room so the
@@ -117,12 +117,12 @@ describe("App — Layout", () => {
     expect(navResize.getAttribute("aria-valuenow")).toBe("232");
 
     expect(await screen.findByRole("heading", { name: "My Reviews" })).toBeTruthy();
-    const previewResize = screen.getByRole("separator", { name: "Resize preview" });
+    const previewResize = screen.getByRole("separator", { name: "Resize Preview" });
     expect(previewResize.getAttribute("aria-valuenow")).toBe("420");
     fireEvent.keyDown(previewResize, { key: "ArrowLeft" });
     expect(previewResize.getAttribute("aria-valuenow")).toBe("436");
     // Layout persistence itself is covered directly and reliably in
-    // DockableSplit.test.tsx; asserting it here too is flaky under this
+    // DockableWorkspace.test.tsx; asserting it here too is flaky under this
     // test's full-app remount/Suspense timing.
     fireEvent.doubleClick(previewResize);
     expect(previewResize.getAttribute("aria-valuenow")).toBe("420");
@@ -169,7 +169,7 @@ describe("App — Layout", () => {
     renderApp();
 
     await screen.findByText("Needs review");
-    const previewResize = screen.getByRole("separator", { name: "Resize preview" });
+    const previewResize = screen.getByRole("separator", { name: "Resize Preview" });
 
     fireEvent.pointerDown(previewResize, { clientX: 100, pointerId: 1 });
     fireEvent.pointerMove(window, { clientX: 84, pointerId: 1 });

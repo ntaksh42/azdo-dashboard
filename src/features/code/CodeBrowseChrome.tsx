@@ -1,28 +1,5 @@
-// Small presentational pieces of the Files view header: the right-pane tab
-// buttons and the clickable breadcrumb.
-
-export function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`rounded px-2 py-0.5 ${
-        active ? "bg-secondary font-medium" : "text-muted-foreground hover:text-foreground"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
+// Small presentational pieces of the Files view header: the clickable
+// breadcrumb for the current path.
 
 // The current path as a clickable breadcrumb: the repository name navigates to
 // the root, each intermediate segment to that folder. The last segment is the

@@ -18,7 +18,7 @@ import { useGridColumns } from "@/lib/useGridColumns";
 import { useRangeSelection } from "@/lib/useRangeSelection";
 import { copyRowUrls } from "@/lib/copyUrls";
 import { ColumnResizeHandle } from "@/components/ResizeHandle";
-import { DockableSplit } from "@/components/DockableSplit";
+import { DockableWorkspace, type DockablePanelSpec } from "@/components/DockableWorkspace";
 import { ColumnVisibilityMenu } from "@/components/ColumnVisibilityMenu";
 import { ActiveFilters } from "@/components/ActiveFilters";
 import { LoadingState } from "@/components/StateDisplay";
@@ -433,16 +433,21 @@ export function CommitResults({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <DockableSplit
+      <DockableWorkspace
         storageKey={`${COMMIT_PREVIEW_WIDTH_STORAGE_KEY}:dockview:v1`}
-        gridTitle="Results"
-        previewTitle="Preview"
-        grid={gridPane}
-        preview={previewPane}
-        defaultPreviewWidth={DEFAULT_COMMIT_PREVIEW_WIDTH}
-        minPreviewWidth={MIN_COMMIT_PREVIEW_WIDTH}
-        maxPreviewWidth={MAX_COMMIT_PREVIEW_WIDTH}
-        maximized={maximized}
+        panels={[
+          { id: "grid", title: "Results", content: gridPane, minWidth: 480 },
+          {
+            id: "preview",
+            title: "Preview",
+            content: previewPane,
+            position: { relativeTo: "grid", direction: "right" },
+            initialWidth: DEFAULT_COMMIT_PREVIEW_WIDTH,
+            minWidth: MIN_COMMIT_PREVIEW_WIDTH,
+            maxWidth: MAX_COMMIT_PREVIEW_WIDTH,
+          },
+        ] satisfies DockablePanelSpec[]}
+        maximizedId={maximized ? "preview" : undefined}
       />
 
       {/* Always in DOM so aria-live fires correctly when content changes. */}

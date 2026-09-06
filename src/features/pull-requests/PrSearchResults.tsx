@@ -27,7 +27,7 @@ import {
   toggleColumnFilterValue,
 } from '@/lib/columnFilters';
 import { PrReviewPanel } from './PrReviewPanel';
-import { DockableSplit } from '@/components/DockableSplit';
+import { DockableWorkspace, type DockablePanelSpec } from '@/components/DockableWorkspace';
 import { MemoPrSearchRow } from './MemoPrSearchRow';
 import {
   type PrSearchFilterableColumn,
@@ -425,16 +425,21 @@ export function PullRequestResults({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <DockableSplit
+      <DockableWorkspace
         storageKey={`${PR_SEARCH_PREVIEW_WIDTH_STORAGE_KEY}:dockview:v1`}
-        gridTitle="Results"
-        previewTitle="Preview"
-        grid={gridPane}
-        preview={previewPane}
-        defaultPreviewWidth={DEFAULT_PR_SEARCH_PREVIEW_WIDTH}
-        minPreviewWidth={MIN_PR_SEARCH_PREVIEW_WIDTH}
-        maxPreviewWidth={MAX_PR_SEARCH_PREVIEW_WIDTH}
-        maximized={maximized}
+        panels={[
+          { id: 'grid', title: 'Results', content: gridPane, minWidth: 480 },
+          {
+            id: 'preview',
+            title: 'Preview',
+            content: previewPane,
+            position: { relativeTo: 'grid', direction: 'right' },
+            initialWidth: DEFAULT_PR_SEARCH_PREVIEW_WIDTH,
+            minWidth: MIN_PR_SEARCH_PREVIEW_WIDTH,
+            maxWidth: MAX_PR_SEARCH_PREVIEW_WIDTH,
+          },
+        ] satisfies DockablePanelSpec[]}
+        maximizedId={maximized ? 'preview' : undefined}
       />
 
       {copyToast && (

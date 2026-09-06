@@ -1,9 +1,8 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import {
   commandErrorMessage,
-  getAppSettings,
   getPullRequestReview,
   prLocator,
   removePullRequestReviewer,
@@ -13,26 +12,17 @@ import {
 import { focusPrimaryGrid, isEditableTarget } from "@/lib/utils";
 import { usePreviewZoom } from "@/lib/usePreviewZoom";
 import { LoadingState, PreviewEmptyState } from "@/components/StateDisplay";
+import { DockableWorkspace, type DockablePanelSpec } from "@/components/DockableWorkspace";
 import { PrReviewHeader } from "./PrReviewHeader";
 import { ReviewTab } from "./PrReviewTabContents";
 import { CommitsTab } from "./PrCommitsTab";
 import { ResultTab } from "./PrSecondaryTabs";
 
-// The Files tab is not the default tab and pulls in the `diff` library, so it
-// is code-split to keep that weight out of the startup bundle.
+// The Files tab pulls in the `diff` library, so it is code-split to keep that
+// weight out of the startup bundle.
 const PrFilesTab = lazy(() =>
   import("./PrFilesTab").then((m) => ({ default: m.PrFilesTab })),
 );
-
-type PanelTab = "review" | "files" | "commits" | "result";
-
-// Order/labels mirror GitHub's PR tabs (Conversation, Commits, Files changed).
-const PANEL_TABS: { key: PanelTab; label: string }[] = [
-  { key: "review", label: "Conversation" },
-  { key: "commits", label: "Commits" },
-  { key: "files", label: "Files changed" },
-  { key: "result", label: "Result" },
-];
 
 export function PrReviewPanel({
   selectedPr,
@@ -43,7 +33,6 @@ export function PrReviewPanel({
   maximized?: boolean;
   onToggleMaximize?: () => void;
 }) {
-  const [tab, setTab] = useState<PanelTab>("review");
   const { canZoomIn, canZoomOut, resetZoom, zoom, zoomIn, zoomOut } = usePreviewZoom();
 
   const reviewQuery = useQuery({
@@ -54,25 +43,9 @@ export function PrReviewPanel({
       selectedPr?.pullRequestId,
     ],
     queryFn: () => getPullRequestReview(prLocator(selectedPr as ReviewPullRequestSummary)),
-    enabled: !!selectedPr && (tab === "review" || tab === "files"),
+    enabled: !!selectedPr,
     staleTime: 60_000,
   });
-
-  const settingsQuery = useQuery({
-    queryKey: ["appSettings"],
-    queryFn: getAppSettings,
-    staleTime: 5 * 60_000,
-  });
-  // The Result tab only surfaces a local HTML folder, so hide it until one is
-  // configured instead of showing an empty "not configured" tab.
-  const hasReviewResultFolder = !!settingsQuery.data?.reviewResultFolderPath;
-  const tabs = hasReviewResultFolder
-    ? PANEL_TABS
-    : PANEL_TABS.filter((option) => option.key !== "result");
-
-  useEffect(() => {
-    if (!hasReviewResultFolder && tab === "result") setTab("review");
-  }, [hasReviewResultFolder, tab]);
 
   // Reviewer management lives in the header now, but the mutations belong to the
   // panel (which owns the review query) so the header can stay presentational.
@@ -133,6 +106,52 @@ export function PrReviewPanel({
     }
   }
 
+  const noPrSelected = <PreviewEmptyState message="Select a pull request." />;
+
+  // Order/labels mirror GitHub's PR tabs (Conversation, Commits, Files
+  // changed); Result stays included even without a configured folder since
+  // ResultTab renders its own "not configured" empty state.
+  const panels: DockablePanelSpec[] = [
+    {
+      id: "review",
+      title: "Conversation",
+      content: !selectedPr ? (
+        noPrSelected
+      ) : (
+        <ReviewTab
+          pr={selectedPr}
+          review={reviewQuery.data ?? null}
+          loading={reviewQuery.isLoading}
+          error={reviewQuery.isError ? commandErrorMessage(reviewQuery.error) : null}
+        />
+      ),
+    },
+    {
+      id: "commits",
+      title: "Commits",
+      content: !selectedPr ? noPrSelected : <CommitsTab pr={selectedPr} />,
+      position: { relativeTo: "review", direction: "within" },
+    },
+    {
+      id: "files",
+      title: "Files changed",
+      content: !selectedPr ? (
+        noPrSelected
+      ) : (
+        <Suspense fallback={<LoadingState />}>
+          <PrFilesTab pr={selectedPr} threads={reviewQuery.data?.threads} />
+        </Suspense>
+      ),
+      position: { relativeTo: "review", direction: "within" },
+    },
+    {
+      id: "result",
+      title: "Result",
+      content: !selectedPr ? noPrSelected : <ResultTab selectedPr={selectedPr} />,
+      position: { relativeTo: "review", direction: "within" },
+    },
+  ];
+
   return (
     <aside
       onKeyDown={handlePreviewKeyDown}
@@ -173,54 +192,15 @@ export function PrReviewPanel({
         </div>
       ) : null}
 
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-2 py-1.5">
-        <div className="flex items-center gap-0.5 rounded-md border border-border bg-muted p-0.5" role="tablist" aria-label="PR review tabs">
-          {tabs.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              role="tab"
-              aria-selected={tab === option.key}
-              onClick={() => setTab(option.key)}
-              className={`rounded px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                tab === option.key
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex min-w-0 items-center gap-2">
-          {reviewQuery.isFetching && tab !== "result" ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-hidden="true" />
-          ) : null}
-        </div>
+      <div className="flex h-6 shrink-0 items-center justify-end gap-2 border-b border-border px-2">
+        {reviewQuery.isFetching ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-hidden="true" />
+        ) : null}
       </div>
 
-      {!selectedPr ? (
-        <PreviewEmptyState message="Select a pull request." />
-      ) : (
-        <div className="flex min-h-0 flex-1 flex-col" style={{ zoom }}>
-          {tab === "review" ? (
-            <ReviewTab
-              pr={selectedPr}
-              review={reviewQuery.data ?? null}
-              loading={reviewQuery.isLoading}
-              error={reviewQuery.isError ? commandErrorMessage(reviewQuery.error) : null}
-            />
-          ) : tab === "files" ? (
-            <Suspense fallback={<LoadingState />}>
-              <PrFilesTab pr={selectedPr} threads={reviewQuery.data?.threads} />
-            </Suspense>
-          ) : tab === "commits" ? (
-            <CommitsTab pr={selectedPr} />
-          ) : (
-            <ResultTab selectedPr={selectedPr} />
-          )}
-        </div>
-      )}
+      <div className="flex min-h-0 flex-1 flex-col" style={{ zoom }}>
+        <DockableWorkspace storageKey="pr-review-panel" panels={panels} />
+      </div>
     </aside>
   );
 }

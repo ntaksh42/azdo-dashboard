@@ -105,7 +105,7 @@ describe("CodeBrowseView", () => {
       await waitFor(() => expect(screen.getAllByText("README.md").length).toBeGreaterThan(0), {
         timeout: 8000,
       });
-      fireEvent.click(screen.getByRole("button", { name: "History" }));
+      fireEvent.pointerDown(screen.getByRole("tab", { name: "History" }), { button: 0 });
       expect(
         await screen.findByText("Add expression utilities", undefined, { timeout: 8000 }),
       ).toBeTruthy();
@@ -165,8 +165,8 @@ describe("CodeBrowseView", () => {
         timeout: 8000,
       });
       fireEvent.click(screen.getAllByText("README.md")[0]);
-      fireEvent.click(await screen.findByRole("button", { name: "Compare" }, { timeout: 8000 }));
-      const baseCombo = screen.getByRole("combobox", { name: "Compare base branch" });
+      fireEvent.pointerDown(await screen.findByRole("tab", { name: "Compare" }, { timeout: 8000 }), { button: 0 });
+      const baseCombo = await screen.findByRole("combobox", { name: "Compare base branch" }, { timeout: 8000 });
       fireEvent.mouseDown(baseCombo);
       fireEvent.pointerDown(await screen.findByText("develop", undefined, { timeout: 8000 }));
       // Demo file content is branch-independent, so the two sides match.
@@ -229,13 +229,18 @@ describe("CodeBrowseView", () => {
     async () => {
       renderView();
       await selectDemoRepository();
-      await waitFor(() => expect(screen.getAllByText("package.json").length).toBeGreaterThan(0), {
-        timeout: 8000,
-      });
+      // "package.json" also matches the file tree on the left, which can
+      // render a tick before the Contents panel (now a dockview pane) mounts
+      // its own folder table -- wait on the table's own rows directly rather
+      // than on text the tree alone can already satisfy.
+      await waitFor(
+        () =>
+          expect(lastContainer.querySelectorAll("[data-folder-item]").length).toBeGreaterThan(1),
+        { timeout: 8000 },
+      );
       const rows = Array.from(
         lastContainer.querySelectorAll<HTMLButtonElement>("[data-folder-item]"),
       );
-      expect(rows.length).toBeGreaterThan(1);
       rows[0].focus();
       fireEvent.keyDown(rows[0], { key: "ArrowDown" });
       expect(document.activeElement).toBe(rows[1]);
@@ -303,7 +308,7 @@ describe("CodeBrowseView", () => {
         timeout: 8000,
       });
       fireEvent.click(screen.getAllByText("README.md")[0]);
-      fireEvent.click(await screen.findByRole("button", { name: "History" }, { timeout: 8000 }));
+      fireEvent.pointerDown(await screen.findByRole("tab", { name: "History" }, { timeout: 8000 }), { button: 0 });
       const viewButtons = await screen.findAllByRole("button", { name: "View" }, {
         timeout: 8000,
       });
@@ -332,8 +337,8 @@ describe("CodeBrowseView", () => {
         timeout: 8000,
       });
       fireEvent.click(screen.getAllByText("README.md")[0]);
-      fireEvent.click(await screen.findByRole("button", { name: "Compare" }, { timeout: 8000 }));
-      fireEvent.change(screen.getByLabelText("Compare base commit or tag"), {
+      fireEvent.pointerDown(await screen.findByRole("tab", { name: "Compare" }, { timeout: 8000 }), { button: 0 });
+      fireEvent.change(await screen.findByLabelText("Compare base commit or tag", undefined, { timeout: 8000 }), {
         target: { value: "abc1234" },
       });
       // Demo file content is ref-independent, so the two sides match.
