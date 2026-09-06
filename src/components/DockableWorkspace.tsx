@@ -42,10 +42,15 @@ interface PanelContentParams {
 }
 
 function PanelContent(props: IDockviewPanelProps<PanelContentParams>) {
-  return <>{props.params.content}</>;
+  return (
+    <div style={{ display: "grid", height: "100%", minHeight: 0, minWidth: 0, width: "100%" }}>
+      {props.params.content}
+    </div>
+  );
 }
 
 const PANEL_COMPONENTS = { content: PanelContent };
+const LAYOUT_SCHEMA_SUFFIX = ":schema:v3";
 
 /**
  * dockview's own resize sash is pointer-drag only (no keyboard path). This
@@ -119,6 +124,7 @@ export function DockableWorkspace({
   const apiRef = useRef<DockviewApi | null>(null);
   const dockviewElementRef = useRef<HTMLDivElement | null>(null);
   const dark = useIsDarkMode();
+  const layoutStorageKey = `${storageKey}${LAYOUT_SCHEMA_SUFFIX}`;
   const panelsRef = useRef(panels);
   panelsRef.current = panels;
 
@@ -160,7 +166,7 @@ export function DockableWorkspace({
       const initialPanels = panelsRef.current;
 
       const saved = readStoredJson<SerializedDockview | undefined>(
-        storageKey,
+        layoutStorageKey,
         (raw) => raw as SerializedDockview,
         undefined,
       );
@@ -242,7 +248,7 @@ export function DockableWorkspace({
           for (const panel of Object.values(layout.panels)) {
             panel.params = undefined;
           }
-          writeStoredJson(storageKey, layout);
+          writeStoredJson(layoutStorageKey, layout);
         } catch (error) {
           console.error(`DockableWorkspace(${storageKey}): failed to persist layout`, error);
         }
@@ -256,7 +262,7 @@ export function DockableWorkspace({
     // created. Later `panels` changes are pushed via the effect below instead
     // of re-running this setup.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [storageKey],
+    [layoutStorageKey, storageKey],
   );
 
   useEffect(() => {
@@ -285,6 +291,7 @@ export function DockableWorkspace({
   return (
     <div className="flex min-h-0 min-w-0 flex-1">
       <DockviewReact
+        key={layoutStorageKey}
         ref={dockviewElementRef}
         className={dark ? "dockview-theme-dark" : "dockview-theme-light"}
         components={PANEL_COMPONENTS}

@@ -73,13 +73,22 @@ describe("DockableWorkspace", () => {
     );
   });
 
+  it("stretches panel content to the full dockview size without shrinking it", () => {
+    renderWorkspace("test:dockable-workspace:full-height");
+
+    const contentLayout = screen.getByText("preview content").parentElement;
+    expect(contentLayout?.style.display).toBe("grid");
+    expect(contentLayout?.style.height).toBe("100%");
+    expect(contentLayout?.style.width).toBe("100%");
+  });
+
   it("resizes a panel from the keyboard and persists the layout", () => {
     const storageKey = "test:dockable-workspace:persist";
     const resize = renderWorkspace(storageKey);
 
     fireEvent.keyDown(resize, { key: "ArrowLeft" });
     expect(resize.getAttribute("aria-valuenow")).toBe("436");
-    expect(window.localStorage.getItem(storageKey)).toBeTruthy();
+    expect(window.localStorage.getItem(`${storageKey}:schema:v3`)).toBeTruthy();
 
     fireEvent.doubleClick(resize);
     expect(resize.getAttribute("aria-valuenow")).toBe("420");
@@ -100,6 +109,24 @@ describe("DockableWorkspace", () => {
     expect(screen.getByText("preview v2")).toBeTruthy();
     expect(screen.queryByText("grid v1")).toBeNull();
     expect(screen.queryByText("preview v1")).toBeNull();
+  });
+
+  it("rebuilds the dockview layout when its storage key changes", () => {
+    const { rerender } = render(
+      <DockableWorkspace storageKey="test:dockable-workspace:key-a" panels={twoPanels()} />,
+    );
+    fireEvent.keyDown(screen.getByRole("separator", { name: "Resize Preview" }), {
+      key: "ArrowLeft",
+    });
+    expect(screen.getByRole("separator", { name: "Resize Preview" }).getAttribute("aria-valuenow")).toBe(
+      "436",
+    );
+
+    rerender(<DockableWorkspace storageKey="test:dockable-workspace:key-b" panels={twoPanels()} />);
+
+    expect(screen.getByRole("separator", { name: "Resize Preview" }).getAttribute("aria-valuenow")).toBe(
+      "420",
+    );
   });
 
   it("clamps keyboard resize to minWidth, and to the space left by the anchor's minimum width", () => {
@@ -125,7 +152,7 @@ describe("DockableWorkspace", () => {
     expect(screen.getByRole("separator", { name: "Resize Preview" }).getAttribute("aria-valuenow")).toBe(
       "436",
     );
-    expect(window.localStorage.getItem(storageKey)).toBeTruthy();
+    expect(window.localStorage.getItem(`${storageKey}:schema:v3`)).toBeTruthy();
     unmount();
 
     render(<DockableWorkspace storageKey={storageKey} panels={twoPanels()} />);
@@ -134,9 +161,28 @@ describe("DockableWorkspace", () => {
     );
   });
 
+  it("ignores layouts saved before the current layout schema", () => {
+    const fixtureKey = "test:dockable-workspace:legacy-fixture";
+    const storageKey = "test:dockable-workspace:legacy";
+    const { unmount } = render(<DockableWorkspace storageKey={fixtureKey} panels={twoPanels()} />);
+    fireEvent.keyDown(screen.getByRole("separator", { name: "Resize Preview" }), {
+      key: "ArrowLeft",
+    });
+    const legacyLayout = window.localStorage.getItem(`${fixtureKey}:schema:v3`);
+    expect(legacyLayout).toBeTruthy();
+    unmount();
+
+    window.localStorage.setItem(`${storageKey}:schema:v2`, legacyLayout!);
+    render(<DockableWorkspace storageKey={storageKey} panels={twoPanels()} />);
+
+    expect(screen.getByRole("separator", { name: "Resize Preview" }).getAttribute("aria-valuenow")).toBe(
+      "420",
+    );
+  });
+
   it("falls back to the default layout when the persisted JSON is corrupt", () => {
     const storageKey = "test:dockable-workspace:corrupt";
-    window.localStorage.setItem(storageKey, "not valid json");
+    window.localStorage.setItem(`${storageKey}:schema:v3`, "not valid json");
 
     const resize = renderWorkspace(storageKey);
     expect(resize.getAttribute("aria-valuenow")).toBe("420");

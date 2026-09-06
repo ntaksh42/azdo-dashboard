@@ -155,7 +155,7 @@ export function PrReviewPanel({
   return (
     <aside
       onKeyDown={handlePreviewKeyDown}
-      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-card focus-within:ring-2 focus-within:ring-ring"
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card focus-within:ring-2 focus-within:ring-inset focus-within:ring-ring"
     >
       {/* Persistent PR header (visible on every tab), GitHub-style. Reviewers
           (with required/optional + remove controls) render here too. */}
@@ -199,7 +199,7 @@ export function PrReviewPanel({
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col" style={{ zoom }}>
-        <DockableWorkspace storageKey="pr-review-panel" panels={panels} />
+        <DockableWorkspace storageKey="pr-review-panel:dockview:v1" panels={panels} />
       </div>
     </aside>
   );

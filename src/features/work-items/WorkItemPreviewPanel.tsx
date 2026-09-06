@@ -257,7 +257,7 @@ export function WorkItemPreviewPanel({
   return (
     <aside
       ref={panelRef}
-      className="flex min-h-0 flex-col overflow-hidden rounded-md border border-border bg-card shadow-sm transition-[border-color,box-shadow] focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/25"
+      className="flex min-h-0 flex-col overflow-hidden rounded-md border border-border bg-card shadow-sm transition-[border-color,box-shadow] focus-within:border-primary focus-within:ring-4 focus-within:ring-inset focus-within:ring-primary/25"
       onKeyDown={handlePreviewPanelKeyDown}
     >
       {selectedItem && preview ? (
