@@ -12,13 +12,7 @@ import { CreateWorkItemDialog, type CreateWorkItemDraft } from './CreateWorkItem
 import { toMatchTarget } from './workItemMatchTarget';
 import { workItemQueryKeys } from './queryKeys';
 
-export function MyWorkItemsPanel({
-  isActivePanel = true,
-}: {
-  /** Ignore the global `azdodeck:work-items:*` command events while another
-   * docked work-item panel is the one actually in focus. */
-  isActivePanel?: boolean;
-} = {}) {
+export function MyWorkItemsPanel() {
   const selectedOrganizationId = useActiveOrganizationId();
   const [filter, setFilter] = useState("");
   const [createDraft, setCreateDraft] = useState<CreateWorkItemDraft | null>(null);
@@ -103,7 +97,6 @@ export function MyWorkItemsPanel({
         autoFocus
         triageScope={`myWorkItems:${selectedOrganizationId}`}
         snoozeOrganizationId={selectedOrganizationId}
-        isActivePanel={isActivePanel}
       />
 
       {createDraft ? (

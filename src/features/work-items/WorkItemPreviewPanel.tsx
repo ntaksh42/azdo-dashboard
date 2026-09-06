@@ -71,7 +71,6 @@ export function WorkItemPreviewPanel({
   previewLoading,
   selectedItem,
   onPreviewUpdated,
-  isActivePanel = true,
 }: {
   customPreviewFields: CustomPreviewField[];
   focusCommentRequest?: number;
@@ -86,9 +85,6 @@ export function WorkItemPreviewPanel({
   previewLoading: boolean;
   selectedItem: WorkItemSummary | null;
   onPreviewUpdated?: (preview: WorkItemPreview) => void;
-  /** Ignore the global `azdodeck:work-items:*` command events while another
-   * docked work-item panel is the one actually in focus. */
-  isActivePanel?: boolean;
 }) {
   const [selectedPreviewFieldKeys, setSelectedPreviewFieldKeys] = useState<PreviewFieldKey[]>(
     () => loadPreviewFieldKeys(),
@@ -141,7 +137,6 @@ export function WorkItemPreviewPanel({
     customFieldsSignature,
     onPreviewUpdated,
     panelRef,
-    isActivePanel,
   });
 
   const {
@@ -188,7 +183,6 @@ export function WorkItemPreviewPanel({
     openStateRequest,
     openPriorityRequest,
     openFieldRequest,
-    isActivePanel,
   });
 
   const commentMentionDisplayNames = useMemo(() => {
@@ -502,7 +496,6 @@ export function WorkItemPreviewPanel({
                 recentMentionOptions={recentMentionOptions}
                 selectedItem={selectedItem}
                 selfOrg={selfOrg}
-                isActivePanel={isActivePanel}
               />
             </>
           ) : previewLoading ? (

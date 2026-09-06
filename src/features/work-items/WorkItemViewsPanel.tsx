@@ -52,9 +52,6 @@ type WorkItemViewsPanelProps = {
   onSelectedViewChange?: (viewId: string | null) => void;
   onSelectedViewRequestHandled?: () => void;
   onViewsChange?: (views: WorkItemQueryView[]) => void;
-  /** Ignore the global `azdodeck:work-items:*` command events while another
-   * docked work-item panel is the one actually in focus. */
-  isActivePanel?: boolean;
 };
 
 export function WorkItemViewsPanel({
@@ -62,7 +59,6 @@ export function WorkItemViewsPanel({
   onSelectedViewChange,
   onSelectedViewRequestHandled,
   onViewsChange,
-  isActivePanel = true,
 }: WorkItemViewsPanelProps) {
   const queryClient = useQueryClient();
   const selectedOrganizationId = useActiveOrganizationId();
@@ -434,7 +430,6 @@ export function WorkItemViewsPanel({
           ) : (
             <WorkItemsGrid
               key={selectedView.id}
-              isActivePanel={isActivePanel}
               activeExternalFilterCount={filter.trim() ? 1 : 0}
               onClearExternalFilters={() => setFilter("")}
               dataUpdatedAt={selectedQuery?.dataUpdatedAt}

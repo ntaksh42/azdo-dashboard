@@ -40,19 +40,13 @@ export function useWorkItemStagedChanges({
   customFieldsSignature,
   onPreviewUpdated,
   panelRef,
-  isActivePanel = true,
 }: {
   selectedItem: WorkItemSummary | null;
   preview: WorkItemPreview | null;
   customFieldsSignature: string;
   onPreviewUpdated: ((preview: WorkItemPreview) => void) | undefined;
   panelRef: React.RefObject<HTMLElement | null>;
-  /** Ignore the global `azdodeck:work-items:*` command events while another
-   * docked work-item panel is the one actually in focus. */
-  isActivePanel?: boolean;
 }) {
-  const isActivePanelRef = useRef(isActivePanel);
-  isActivePanelRef.current = isActivePanel;
   const queryClient = useQueryClient();
 
   const [staged, setStaged] = useState<StagedChanges>({});
@@ -391,14 +385,8 @@ export function useWorkItemStagedChanges({
   undoApplyRef.current = () => { void undoLastApply(); };
 
   useEffect(() => {
-    function applyStagedFromCommand() {
-      if (!isActivePanelRef.current) return;
-      applyStagedRef.current();
-    }
-    function undoApplyFromCommand() {
-      if (!isActivePanelRef.current) return;
-      undoApplyRef.current();
-    }
+    function applyStagedFromCommand() { applyStagedRef.current(); }
+    function undoApplyFromCommand() { undoApplyRef.current(); }
     window.addEventListener("azdodeck:work-items:apply-staged", applyStagedFromCommand);
     window.addEventListener("azdodeck:work-items:undo-apply", undoApplyFromCommand);
     return () => {

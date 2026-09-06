@@ -42,7 +42,6 @@ export function CommentComposer({
   recentMentionOptions,
   selectedItem,
   selfOrg,
-  isActivePanel = true,
 }: {
   focusCommentRequest?: number;
   hasStagedChanges: boolean;
@@ -53,12 +52,7 @@ export function CommentComposer({
   recentMentionOptions: MentionCandidate[];
   selectedItem: WorkItemSummary | null;
   selfOrg: Organization | undefined;
-  /** Ignore the global `azdodeck:work-items:*` command events while another
-   * docked work-item panel is the one actually in focus. */
-  isActivePanel?: boolean;
 }) {
-  const isActivePanelRef = useRef(isActivePanel);
-  isActivePanelRef.current = isActivePanel;
   const queryClient = useQueryClient();
   const [commentText, setCommentText] = useState("");
   const mentionsToRecordRef = useRef<
@@ -121,11 +115,10 @@ export function CommentComposer({
 
   useEffect(() => {
     function focusComment() {
-      if (!isActivePanelRef.current || !selectedItem) return;
+      if (!selectedItem) return;
       textareaRef.current?.focus();
     }
     function submitCurrentComment() {
-      if (!isActivePanelRef.current) return;
       postComment();
     }
     window.addEventListener("azdodeck:work-items:focus-comment", focusComment);

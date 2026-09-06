@@ -41,7 +41,6 @@ export function useWorkItemPickerState({
   openStateRequest,
   openPriorityRequest,
   openFieldRequest,
-  isActivePanel = true,
 }: {
   selectedItem: WorkItemSummary | null;
   preview: WorkItemPreview | null;
@@ -51,12 +50,7 @@ export function useWorkItemPickerState({
   openStateRequest: number | undefined;
   openPriorityRequest: number | undefined;
   openFieldRequest: number | undefined;
-  /** Ignore the global `azdodeck:work-items:*` command events while another
-   * docked work-item panel is the one actually in focus. */
-  isActivePanel?: boolean;
 }) {
-  const isActivePanelRef = useRef(isActivePanel);
-  isActivePanelRef.current = isActivePanel;
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [assigneeQuery, setAssigneeQuery] = useState("");
   const [statePickerOpen, setStatePickerOpen] = useState(false);
@@ -336,14 +330,14 @@ export function useWorkItemPickerState({
 
   useEffect(() => {
     function openState() {
-      if (!isActivePanelRef.current || !selectedItem) return;
+      if (!selectedItem) return;
       setStatePickerOpen(true);
       setAssigneeOpen(false);
       setReasonEditorOpen(false);
       setPriorityPickerOpen(false);
     }
     function openAssignee() {
-      if (!isActivePanelRef.current || !selectedItem) return;
+      if (!selectedItem) return;
       setAssigneeOpen(true);
       setStatePickerOpen(false);
       setReasonEditorOpen(false);
@@ -351,16 +345,13 @@ export function useWorkItemPickerState({
       setAssigneeQuery("");
     }
     function openPriority() {
-      if (!isActivePanelRef.current || !selectedItem) return;
+      if (!selectedItem) return;
       setPriorityPickerOpen(true);
       setAssigneeOpen(false);
       setReasonEditorOpen(false);
       setStatePickerOpen(false);
     }
-    function openField() {
-      if (!isActivePanelRef.current) return;
-      openNextCustomFieldRef.current();
-    }
+    function openField() { openNextCustomFieldRef.current(); }
     window.addEventListener("azdodeck:work-items:open-state", openState);
     window.addEventListener("azdodeck:work-items:open-assignee", openAssignee);
     window.addEventListener("azdodeck:work-items:open-priority", openPriority);

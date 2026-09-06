@@ -30,13 +30,9 @@ const WORK_ITEM_TYPE_OPTIONS = [
 export function WorkItemSearch({
   externalSearch,
   onExternalSearchHandled,
-  isActivePanel = true,
 }: {
   externalSearch?: { query: string; requestId: number; organizationId?: string } | null;
   onExternalSearchHandled?: () => void;
-  /** Ignore the global `azdodeck:work-items:*` command events while another
-   * docked work-item panel is the one actually in focus. */
-  isActivePanel?: boolean;
 }) {
   const organizationId = useActiveOrganizationId();
   const [query, setQuery] = useState("");
@@ -179,12 +175,7 @@ export function WorkItemSearch({
         <ErrorState message={commandErrorMessage(mutation.error)} />
       ) : null}
 
-      <WorkItemsGrid
-        loading={mutation.isPending}
-        results={filteredResults}
-        searched={mutation.isSuccess}
-        isActivePanel={isActivePanel}
-      />
+      <WorkItemsGrid loading={mutation.isPending} results={filteredResults} searched={mutation.isSuccess} />
     </div>
   );
 }

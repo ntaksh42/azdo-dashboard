@@ -438,7 +438,6 @@ function AppShell() {
         />
         <AppContent
           activeView={activeView}
-          onActiveViewChange={setView}
           organizations={organizations}
           organizationsQuery={organizationsQuery}
           pullRequestSearchRequest={pullRequestSearchRequest}
