@@ -26,7 +26,7 @@ import {
   columnFilterUniqueValues,
   toggleColumnFilterValue,
 } from '@/lib/columnFilters';
-import { PrReviewPanel } from './PrReviewPanel';
+import { usePrReviewPanels } from './usePrReviewPanels';
 import { DockableWorkspace, type DockablePanelSpec } from '@/components/DockableWorkspace';
 import { MemoPrSearchRow } from './MemoPrSearchRow';
 import {
@@ -300,6 +300,12 @@ export function PullRequestResults({
     if (selectedResult) recordRecentPullRequest(selectedResult);
   }, [selectedResult]);
 
+  const { anchor: reviewAnchor, secondary: reviewSecondary } = usePrReviewPanels({
+    selectedPr,
+    maximized,
+    onToggleMaximize: () => setMaximized((value) => !value),
+  });
+
   const gridPane = (
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-card">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
@@ -415,31 +421,22 @@ export function PullRequestResults({
       </div>
   );
 
-  const previewPane = (
-    <PrReviewPanel
-      selectedPr={selectedPr}
-      maximized={maximized}
-      onToggleMaximize={() => setMaximized((value) => !value)}
-    />
-  );
-
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <DockableWorkspace
-        storageKey={`${PR_SEARCH_PREVIEW_WIDTH_STORAGE_KEY}:dockview:v1`}
+        storageKey={`${PR_SEARCH_PREVIEW_WIDTH_STORAGE_KEY}:dockview:v2`}
         panels={[
           { id: 'grid', title: 'Results', content: gridPane, minWidth: 480 },
           {
-            id: 'preview',
-            title: 'Preview',
-            content: previewPane,
+            ...reviewAnchor,
             position: { relativeTo: 'grid', direction: 'right' },
             initialWidth: DEFAULT_PR_SEARCH_PREVIEW_WIDTH,
             minWidth: MIN_PR_SEARCH_PREVIEW_WIDTH,
             maxWidth: MAX_PR_SEARCH_PREVIEW_WIDTH,
           },
+          ...reviewSecondary,
         ] satisfies DockablePanelSpec[]}
-        maximizedId={maximized ? 'preview' : undefined}
+        maximizedId={maximized ? 'review' : undefined}
       />
 
       {copyToast && (

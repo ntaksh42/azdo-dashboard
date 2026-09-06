@@ -12,7 +12,7 @@ import { LoadingState, ErrorState } from '@/components/StateDisplay';
 import { openExternalUrl } from '@/lib/openExternal';
 import { copyRowUrls } from '@/lib/copyUrls';
 import { toggleTriageArchived } from '@/lib/triage';
-import { PrReviewPanel } from './PrReviewPanel';
+import { usePrReviewPanels } from './usePrReviewPanels';
 import { MemoReviewPrRow } from './MemoReviewPrRow';
 import { ReviewFilterBar } from './ReviewFilterBar';
 import { ReviewStatusBar } from './ReviewStatusBar';
@@ -40,6 +40,11 @@ export function MyReviewsGrid({
   onSelectRequestHandled,
 }: MyReviewsGridProps) {
   const g = useMyReviewsGrid({ selectRequest, onSelectRequestHandled });
+  const { anchor: reviewAnchor, secondary: reviewSecondary } = usePrReviewPanels({
+    selectedPr: g.selectedPr,
+    maximized: g.maximized,
+    onToggleMaximize: () => g.setMaximized((v) => !v),
+  });
 
   function handleKeyDown(e: React.KeyboardEvent) {
     const editable = isEditableTarget(e.target);
@@ -228,7 +233,7 @@ export function MyReviewsGrid({
         filterSuggestionPool={g.filterSuggestionPool}
       />
       <DockableWorkspace
-        storageKey={`${REVIEW_PREVIEW_WIDTH_STORAGE_KEY}:dockview:v1`}
+        storageKey={`${REVIEW_PREVIEW_WIDTH_STORAGE_KEY}:dockview:v2`}
         panels={[
           {
             id: 'grid',
@@ -354,22 +359,15 @@ export function MyReviewsGrid({
             ),
           },
           {
-            id: 'preview',
-            title: 'Preview',
+            ...reviewAnchor,
             position: { relativeTo: 'grid', direction: 'right' },
             initialWidth: DEFAULT_REVIEW_PREVIEW_WIDTH,
             minWidth: MIN_REVIEW_PREVIEW_WIDTH,
             maxWidth: MAX_REVIEW_PREVIEW_WIDTH,
-            content: (
-              <PrReviewPanel
-                selectedPr={g.selectedPr}
-                maximized={g.maximized}
-                onToggleMaximize={() => g.setMaximized((v) => !v)}
-              />
-            ),
           },
+          ...reviewSecondary,
         ] satisfies DockablePanelSpec[]}
-        maximizedId={g.maximized ? 'preview' : undefined}
+        maximizedId={g.maximized ? 'review' : undefined}
       />
       {g.openFilterCol && g.filterAnchorRect ? (
         <ColumnFilterDropdown

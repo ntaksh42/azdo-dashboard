@@ -129,7 +129,7 @@ function approvedBadge(review: PullRequestReview | null) {
 }
 
 // Comment activity badge. Counts only threads that carry a human comment
-// (mirrors the user-thread filter in PrReviewPanel) so auto-generated system
+// (mirrors the user-thread filter in usePrReviewPanels) so auto-generated system
 // threads such as votes and ref updates do not inflate the number. Highlights
 // when any thread is still unresolved; renders nothing when there are no
 // comment threads so an empty PR does not show a "0".

@@ -117,7 +117,7 @@ describe("App — Layout", () => {
     expect(navResize.getAttribute("aria-valuenow")).toBe("232");
 
     expect(await screen.findByRole("heading", { name: "My Reviews" })).toBeTruthy();
-    const previewResize = screen.getByRole("separator", { name: "Resize Preview" });
+    const previewResize = screen.getByRole("separator", { name: "Resize Conversation" });
     expect(previewResize.getAttribute("aria-valuenow")).toBe("420");
     fireEvent.keyDown(previewResize, { key: "ArrowLeft" });
     expect(previewResize.getAttribute("aria-valuenow")).toBe("436");
@@ -169,7 +169,7 @@ describe("App — Layout", () => {
     renderApp();
 
     await screen.findByText("Needs review");
-    const previewResize = screen.getByRole("separator", { name: "Resize Preview" });
+    const previewResize = screen.getByRole("separator", { name: "Resize Conversation" });
 
     fireEvent.pointerDown(previewResize, { clientX: 100, pointerId: 1 });
     fireEvent.pointerMove(window, { clientX: 84, pointerId: 1 });

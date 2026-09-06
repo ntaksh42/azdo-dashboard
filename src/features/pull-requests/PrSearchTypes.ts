@@ -9,7 +9,7 @@ export const MIN_PR_SEARCH_PREVIEW_WIDTH = 320;
 export const MAX_PR_SEARCH_PREVIEW_WIDTH = 8192;
 export const PR_SEARCH_PREVIEW_WIDTH_STORAGE_KEY = 'azdodeck:layout:prSearchPreviewWidth';
 
-// Adapts a search result to the shape PrReviewPanel needs; the panel refetches
+// Adapts a search result to the shape usePrReviewPanels needs; it refetches
 // the real review (vote/reviewers/threads) by locator, so these are defaults.
 export function toReviewSummary(pr: PullRequestSummary): ReviewPullRequestSummary {
   return {

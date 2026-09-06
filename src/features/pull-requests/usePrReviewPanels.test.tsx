@@ -1,17 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReviewPullRequestSummary } from "@/lib/azdoCommands";
-import { PrReviewPanel } from "./PrReviewPanel";
+import { DockableWorkspace, type DockablePanelSpec } from "@/components/DockableWorkspace";
+import { usePrReviewPanels } from "./usePrReviewPanels";
 
 // This project's vitest config has no global setup, so Testing Library's
 // automatic per-test cleanup isn't registered; unmount explicitly so a prior
 // render's panel doesn't leak into the next test's `screen` queries.
 afterEach(cleanup);
 
-// PrReviewPanel now renders a DockableWorkspace (storageKey "pr-review-panel"),
-// which persists its dockview layout (incl. the active tab) to localStorage;
-// clear it so one test's tab switch does not leak into the next test's render.
+// The harness below renders a DockableWorkspace (storageKey
+// "pr-review-harness-test"), which persists its dockview layout (incl. the
+// active tab) to localStorage; clear it so one test's tab switch does not
+// leak into the next test's render.
 beforeEach(() => window.localStorage.clear());
 
 const pr: ReviewPullRequestSummary = {
@@ -36,29 +38,46 @@ const pr: ReviewPullRequestSummary = {
   ciCheckCount: 0,
 };
 
+// Mirrors how MyReviewsGrid/PrSearchResults actually embed these panels: the
+// review tabs sit as flat siblings of a grid panel in one DockableWorkspace
+// (usePrReviewPanels no longer nests a dockview of its own).
+function PrReviewHarness({ selectedPr }: { selectedPr: ReviewPullRequestSummary | null }) {
+  const { anchor, secondary } = usePrReviewPanels({ selectedPr });
+  const panels: DockablePanelSpec[] = [
+    { id: "grid", title: "Grid", content: <div>grid</div>, minWidth: 200 },
+    {
+      ...anchor,
+      position: { relativeTo: "grid", direction: "right" },
+      initialWidth: 600,
+      minWidth: 300,
+      maxWidth: 4096,
+    },
+    ...secondary,
+  ];
+  return <DockableWorkspace storageKey="pr-review-harness-test" panels={panels} />;
+}
+
 function renderPanel(selectedPr: ReviewPullRequestSummary = pr) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <PrReviewPanel selectedPr={selectedPr} />
+      <PrReviewHarness selectedPr={selectedPr} />
     </QueryClientProvider>,
   );
 }
 
 describe("PrReviewPanel status actions", () => {
   it(
-    "keeps review metadata in one compact row without an idle loading spacer",
+    "shows the Conversation tab alongside the PR metadata",
     async () => {
       renderPanel();
       await screen.findByRole("button", { name: "Complete" }, { timeout: 8000 });
 
       const metadata = screen.getByRole("group", { name: "Pull request metadata" });
-      expect(within(metadata).getByText(/Author/)).toBeTruthy();
-      expect(within(metadata).getByText("1 / 2 approved")).toBeTruthy();
-      expect(within(metadata).getByText(/Demo User/)).toBeTruthy();
-      expect(
-        metadata.parentElement?.nextElementSibling?.querySelector('[role="tab"]')?.textContent,
-      ).toBe("Conversation");
+      expect(metadata.textContent).toContain("Author");
+      expect(metadata.textContent).toContain("1 / 2 approved");
+      expect(metadata.textContent).toContain("Demo User");
+      expect(screen.getByRole("tab", { name: "Conversation" })).toBeTruthy();
     },
     15000,
   );
