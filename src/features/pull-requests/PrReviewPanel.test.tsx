@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReviewPullRequestSummary } from "@/lib/azdoCommands";
 import { PrReviewPanel } from "./PrReviewPanel";
@@ -46,6 +46,23 @@ function renderPanel(selectedPr: ReviewPullRequestSummary = pr) {
 }
 
 describe("PrReviewPanel status actions", () => {
+  it(
+    "keeps review metadata in one compact row without an idle loading spacer",
+    async () => {
+      renderPanel();
+      await screen.findByRole("button", { name: "Complete" }, { timeout: 8000 });
+
+      const metadata = screen.getByRole("group", { name: "Pull request metadata" });
+      expect(within(metadata).getByText(/Author/)).toBeTruthy();
+      expect(within(metadata).getByText("1 / 2 approved")).toBeTruthy();
+      expect(within(metadata).getByText(/Demo User/)).toBeTruthy();
+      expect(
+        metadata.parentElement?.nextElementSibling?.querySelector('[role="tab"]')?.textContent,
+      ).toBe("Conversation");
+    },
+    15000,
+  );
+
   it(
     "renders Complete inline and Abandon in the overflow menu for an active PR",
     async () => {

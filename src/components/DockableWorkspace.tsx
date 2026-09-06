@@ -3,7 +3,7 @@ import {
   DockviewReact,
   DockviewDefaultTab,
   themeDark,
-  themeVisualStudio,
+  themeLight,
   type DockviewApi,
   type DockviewReadyEvent,
   type IDockviewHeaderActionsProps,
@@ -117,6 +117,7 @@ export function DockableWorkspace({
   activatePanel?: { id: string; key: number };
 }) {
   const apiRef = useRef<DockviewApi | null>(null);
+  const dockviewElementRef = useRef<HTMLDivElement | null>(null);
   const dark = useIsDarkMode();
   const panelsRef = useRef(panels);
   panelsRef.current = panels;
@@ -153,6 +154,9 @@ export function DockableWorkspace({
     (event: DockviewReadyEvent) => {
       const api = event.api;
       apiRef.current = api;
+      dockviewElementRef.current
+        ?.querySelector<HTMLElement>(".dv-dockview")
+        ?.style.setProperty("--dv-tabs-and-actions-container-height", "20px");
       const initialPanels = panelsRef.current;
 
       const saved = readStoredJson<SerializedDockview | undefined>(
@@ -168,6 +172,16 @@ export function DockableWorkspace({
           restored = initialPanels.every((spec) => api.getPanel(spec.id) !== undefined);
         } catch {
           restored = false;
+        }
+        // A saved layout from before a panel was added/removed (e.g. an
+        // older build's 2-panel layout once a 3rd panel like "result" was
+        // introduced) restores the panels it does know about, so `restored`
+        // above comes back false -- but they're still sitting in `api` and
+        // would collide with the fresh `addPanel` calls below ("panel with
+        // id ... already exists"). Tear down whatever fromJSON left behind
+        // before rebuilding from scratch.
+        if (!restored) {
+          for (const panel of [...api.panels]) api.removePanel(panel);
         }
       }
 
@@ -214,12 +228,24 @@ export function DockableWorkspace({
       // object (not a real element), so restoring it later would crash
       // React. Strip params before persisting; content is always re-supplied
       // via `updateParameters` on restore anyway.
+      //
+      // A drag-and-drop move can leave dockview's internal grid mid-restructure
+      // for one of these events; serializing at that exact moment has been
+      // observed to throw ("Index out of bounds" inside dockview's own
+      // gridview code) even though the drag itself completes fine. A failed
+      // persist is not worth crashing the whole app over -- log and skip
+      // that snapshot; the next layout/dimension event (once things settle)
+      // persists normally.
       const persist = () => {
-        const layout = api.toJSON();
-        for (const panel of Object.values(layout.panels)) {
-          panel.params = undefined;
+        try {
+          const layout = api.toJSON();
+          for (const panel of Object.values(layout.panels)) {
+            panel.params = undefined;
+          }
+          writeStoredJson(storageKey, layout);
+        } catch (error) {
+          console.error(`DockableWorkspace(${storageKey}): failed to persist layout`, error);
         }
-        writeStoredJson(storageKey, layout);
       };
       api.onDidLayoutChange(persist);
       for (const spec of initialPanels) {
@@ -259,7 +285,8 @@ export function DockableWorkspace({
   return (
     <div className="flex min-h-0 min-w-0 flex-1">
       <DockviewReact
-        className={dark ? "dockview-theme-dark" : "dockview-theme-vs"}
+        ref={dockviewElementRef}
+        className={dark ? "dockview-theme-dark" : "dockview-theme-light"}
         components={PANEL_COMPONENTS}
         defaultTabComponent={(props) => <DockviewDefaultTab {...props} hideClose />}
         // A background tab (stacked behind the active one in the same group)
@@ -268,9 +295,15 @@ export function DockableWorkspace({
         // each always being its own separate, always-visible split. Panels
         // genuinely visible side by side in different groups stay mounted.
         defaultRenderer="onlyWhenVisible"
+        // The default "auto" strategy drags tabs via native HTML5
+        // drag-and-drop for a mouse pointer, which is unreliable inside the
+        // desktop app's WebView2 host (drags don't register a drop). Force
+        // dockview's own pointer-based DnD everywhere so dragging a tab into
+        // a new split/tab group works the same in the browser and desktop.
+        dndStrategy="pointer"
         rightHeaderActionsComponent={rightHeaderActionsComponent}
         onReady={onReady}
-        theme={dark ? themeDark : themeVisualStudio}
+        theme={dark ? themeDark : themeLight}
       />
     </div>
   );

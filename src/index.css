@@ -51,6 +51,12 @@
 
 @layer base {
   html {
+    /* The desktop window's own background is black; anywhere a fixed-position
+       element (the sidebar, dockview panels) leaves a sub-pixel compositing
+       gap uncovered by `body`'s own background, that black shows through as
+       a stray dark seam. Painting it here too closes that gap regardless of
+       where it occurs. */
+    background: hsl(var(--background));
     font-size: 15px;
   }
 

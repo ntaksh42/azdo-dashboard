@@ -192,11 +192,11 @@ export function PrReviewPanel({
         </div>
       ) : null}
 
-      <div className="flex h-6 shrink-0 items-center justify-end gap-2 border-b border-border px-2">
-        {reviewQuery.isFetching ? (
+      {reviewQuery.isFetching ? (
+        <div className="flex h-6 shrink-0 items-center justify-end gap-2 border-b border-border px-2">
           <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-hidden="true" />
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col" style={{ zoom }}>
         <DockableWorkspace storageKey="pr-review-panel" panels={panels} />

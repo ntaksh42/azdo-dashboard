@@ -13,6 +13,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  document.documentElement.classList.remove("dark");
   vi.restoreAllMocks();
 });
 
@@ -37,6 +38,32 @@ function renderWorkspace(storageKey = "test:dockable-workspace", panels = twoPan
 }
 
 describe("DockableWorkspace", () => {
+  it("uses dockview's light theme when the app is in light mode", () => {
+    renderWorkspace("test:dockable-workspace:light-theme");
+
+    expect(document.querySelector(".dockview-theme-light")).toBeTruthy();
+    expect(document.querySelector(".dockview-theme-vs")).toBeNull();
+  });
+
+  it("keeps dockview tab bars compact", () => {
+    renderWorkspace("test:dockable-workspace:compact-tabs");
+
+    const dockview = document.querySelector(".dv-dockview");
+    expect(getComputedStyle(dockview!).getPropertyValue("--dv-tabs-and-actions-container-height")).toBe(
+      "20px",
+    );
+  });
+
+  it("keeps dockview tab bars compact in dark mode", () => {
+    document.documentElement.classList.add("dark");
+    renderWorkspace("test:dockable-workspace:compact-tabs-dark");
+
+    const dockview = document.querySelector(".dv-dockview");
+    expect(getComputedStyle(dockview!).getPropertyValue("--dv-tabs-and-actions-container-height")).toBe(
+      "20px",
+    );
+  });
+
   it("sizes the split panel to its initialWidth and renders every panel", () => {
     renderWorkspace();
     expect(screen.getByText("grid content")).toBeTruthy();
