@@ -1,14 +1,19 @@
-import { useState, type CSSProperties } from 'react';
+import { useState } from 'react';
 import { commandErrorMessage } from '@/lib/azdoCommands';
 import { CreateWorkItemDialog, type CreateWorkItemDraft } from './CreateWorkItemDialog';
 import { SnoozeMenu } from '@/components/SnoozeMenu';
 import { SnoozedItemsPanel } from '@/components/SnoozedItemsPanel';
-import { ResizeHandle } from '@/components/ResizeHandle';
+import { DockableWorkspace, type DockablePanelSpec } from '@/components/DockableWorkspace';
 import { ColumnVisibilityMenu } from '@/components/ColumnVisibilityMenu';
+import { PreviewEmptyState } from '@/components/StateDisplay';
 import { WorkItemPreviewPanel } from './WorkItemPreviewPanel';
+import { WorkItemResultSection } from './WorkItemResultSection';
 import { storeCustomPreviewFields } from './previewFieldsStorage';
 import { workItemQueryKeys } from './queryKeys';
 import {
+  DEFAULT_WORK_ITEM_PREVIEW_WIDTH,
+  MAX_WORK_ITEM_PREVIEW_WIDTH,
+  WORK_ITEM_PREVIEW_WIDTH_STORAGE_KEY,
   WI_GRID_KEYS,
   WI_GRID_REQUIRED_COLUMNS,
   wiSortLabels,
@@ -83,6 +88,135 @@ export function WorkItemsGrid({
   // Duplicate flow: the preview panel hands over a prefilled draft (D key or
   // the header button) and the create dialog finishes the job.
   const [duplicateDraft, setDuplicateDraft] = useState<CreateWorkItemDraft | null>(null);
+
+  const previewStorageKey = storageKeyScope
+    ? `${WORK_ITEM_PREVIEW_WIDTH_STORAGE_KEY}:${storageKeyScope}`
+    : WORK_ITEM_PREVIEW_WIDTH_STORAGE_KEY;
+
+  const gridPane = (
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-card">
+      {state.showSnoozed && snoozeOrganizationId ? (
+        <SnoozedItemsPanel
+          organizationId={snoozeOrganizationId}
+          itemType="work_item"
+          onUnsnoozed={() =>
+            state.queryClient.invalidateQueries({
+              queryKey: workItemQueryKeys.myItems(snoozeOrganizationId),
+            })
+          }
+        />
+      ) : (
+      <div ref={state.gridScrollRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-auto">
+        <div style={{ minWidth: state.gridMinWidth }}>
+          <WiGridHeader
+            displayed={g.displayed}
+            checkedIds={state.checkedIds}
+            setCheckedIds={state.setCheckedIds}
+            setLastCheckedIndex={state.setLastCheckedIndex}
+            wiColTemplate={state.wiColTemplate}
+            visibleColumns={state.visibleColumns}
+            sort={state.sort}
+            onSort={state.applyWiSort}
+            columnFilters={state.columnFilters}
+            onFilterOpen={g.openFilter}
+            columnResizeProps={state.columnResizeProps}
+            extraColumns={extraColumns}
+          />
+          <WiGridBody
+            showBlockingLoading={g.showBlockingLoading}
+            searched={searched}
+            sorted={g.sorted}
+            displayed={g.displayed}
+            emptyMessage={emptyMessage}
+            clearAllFilters={g.clearAllFilters}
+            firstVirtualRow={g.firstVirtualRow}
+            virtualRows={g.virtualRows}
+            selectedIndex={state.selectedIndex}
+            checkedIds={state.checkedIds}
+            unreadKeys={g.unreadKeys}
+            wiColTemplate={state.wiColTemplate}
+            visibleColumns={state.visibleColumns}
+            extraColumns={extraColumns}
+            staleThresholdDays={g.staleThresholdDays}
+            rowColorRules={g.rowColorRules}
+            rowRefs={state.rowRefs}
+            virtualTopPadding={g.virtualTopPadding}
+            virtualBottomPadding={g.virtualBottomPadding}
+            setSelectedIndex={state.setSelectedIndex}
+            handleCheckboxChange={g.handleCheckboxChange}
+            onShiftRangeSelect={g.selectRangeTo}
+            onCtrlToggleSelect={g.toggleSelectionAt}
+            onClearSelection={g.clearCheckedIds}
+          />
+        </div>
+      </div>
+      )}
+      <WiGridStatusBar
+        loading={loading}
+        searched={searched}
+        hasActiveColumnFilters={g.hasActiveColumnFilters}
+        displayed={g.displayed}
+        sorted={g.sorted}
+        dataUpdatedAt={dataUpdatedAt}
+        isFetching={isFetching}
+        triageScope={triageScope}
+        showDone={state.showDone}
+        setShowDone={state.setShowDone}
+        setSelectedIndex={state.setSelectedIndex}
+        archivedKeys={g.archivedKeys}
+        snoozeEnabled={state.snoozeEnabled}
+        showSnoozed={state.showSnoozed}
+        setShowSnoozed={state.setShowSnoozed}
+        activeFilterCount={g.activeFilterCount}
+        clearAllFilters={g.clearAllFilters}
+        staleOnly={state.staleOnly}
+        setStaleOnly={state.setStaleOnly}
+        staleCount={g.staleCount}
+        staleThresholdDays={g.staleThresholdDays}
+        setColumnMenuRect={state.setColumnMenuRect}
+      />
+    </div>
+  );
+
+  const previewPane = (
+    <WorkItemPreviewPanel
+      customPreviewFields={state.customPreviewFields}
+      focusCommentRequest={state.focusCommentRequest}
+      onCustomPreviewFieldsChange={(fields) => {
+        storeCustomPreviewFields(fields);
+        state.setCustomPreviewFields(fields);
+      }}
+      openAssigneeRequest={state.openAssigneeRequest}
+      openFieldRequest={state.openFieldRequest}
+      openPriorityRequest={state.openPriorityRequest}
+      openStateRequest={state.openStateRequest}
+      preview={g.previewQuery.data ?? null}
+      previewError={g.previewQuery.isError ? commandErrorMessage(g.previewQuery.error) : null}
+      previewLoading={g.previewQuery.isFetching}
+      selectedItem={g.selectedItem}
+      onPreviewUpdated={g.handlePreviewUpdated}
+      onDuplicate={(draft) =>
+        setDuplicateDraft({
+          projectId: draft.projectId,
+          workItemType: draft.workItemType ?? undefined,
+          title: draft.title,
+          priority: draft.priority ?? undefined,
+          areaPath: draft.areaPath ?? undefined,
+          iterationPath: draft.iterationPath ?? undefined,
+          tags: draft.tags.join("; "),
+          assignedTo: draft.assignedTo ?? undefined,
+        })
+      }
+    />
+  );
+
+  const resultPane = g.selectedItem ? (
+    <WorkItemResultSection workItemId={g.selectedItem.id} />
+  ) : (
+    <div className="flex h-full items-center justify-center p-4">
+      <PreviewEmptyState message="Select a work item to see its investigation result." />
+    </div>
+  );
 
   return (
     <div
@@ -160,142 +294,36 @@ export function WorkItemsGrid({
           onDismiss={() => g.bulk.setBulkFailures([])}
         />
       ) : null}
-      <div
-        className={`grid min-h-0 flex-1 items-stretch gap-3 ${
-          previewVisible
-            ? "xl:grid-cols-[minmax(0,1fr)_8px_minmax(300px,var(--work-item-preview-width))]"
-            : "xl:grid-cols-[minmax(0,1fr)]"
-        }`}
-        style={{ "--work-item-preview-width": `${state.previewWidth}px` } as CSSProperties}
-      >
-        <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card">
-          {state.showSnoozed && snoozeOrganizationId ? (
-            <SnoozedItemsPanel
-              organizationId={snoozeOrganizationId}
-              itemType="work_item"
-              onUnsnoozed={() =>
-                state.queryClient.invalidateQueries({
-                  queryKey: workItemQueryKeys.myItems(snoozeOrganizationId),
-                })
-              }
-            />
-          ) : (
-          <div ref={state.gridScrollRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-auto">
-            <div style={{ minWidth: state.gridMinWidth }}>
-              <WiGridHeader
-                displayed={g.displayed}
-                checkedIds={state.checkedIds}
-                setCheckedIds={state.setCheckedIds}
-                setLastCheckedIndex={state.setLastCheckedIndex}
-                wiColTemplate={state.wiColTemplate}
-                visibleColumns={state.visibleColumns}
-                sort={state.sort}
-                onSort={state.applyWiSort}
-                columnFilters={state.columnFilters}
-                onFilterOpen={g.openFilter}
-                columnResizeProps={state.columnResizeProps}
-                extraColumns={extraColumns}
-              />
-              <WiGridBody
-                showBlockingLoading={g.showBlockingLoading}
-                searched={searched}
-                sorted={g.sorted}
-                displayed={g.displayed}
-                emptyMessage={emptyMessage}
-                clearAllFilters={g.clearAllFilters}
-                firstVirtualRow={g.firstVirtualRow}
-                virtualRows={g.virtualRows}
-                selectedIndex={state.selectedIndex}
-                checkedIds={state.checkedIds}
-                unreadKeys={g.unreadKeys}
-                wiColTemplate={state.wiColTemplate}
-                visibleColumns={state.visibleColumns}
-                extraColumns={extraColumns}
-                staleThresholdDays={g.staleThresholdDays}
-                rowColorRules={g.rowColorRules}
-                rowRefs={state.rowRefs}
-                virtualTopPadding={g.virtualTopPadding}
-                virtualBottomPadding={g.virtualBottomPadding}
-                setSelectedIndex={state.setSelectedIndex}
-                handleCheckboxChange={g.handleCheckboxChange}
-                onShiftRangeSelect={g.selectRangeTo}
-                onCtrlToggleSelect={g.toggleSelectionAt}
-                onClearSelection={g.clearCheckedIds}
-              />
-            </div>
-          </div>
-          )}
-          <WiGridStatusBar
-            loading={loading}
-            searched={searched}
-            hasActiveColumnFilters={g.hasActiveColumnFilters}
-            displayed={g.displayed}
-            sorted={g.sorted}
-            dataUpdatedAt={dataUpdatedAt}
-            isFetching={isFetching}
-            triageScope={triageScope}
-            showDone={state.showDone}
-            setShowDone={state.setShowDone}
-            setSelectedIndex={state.setSelectedIndex}
-            archivedKeys={g.archivedKeys}
-            snoozeEnabled={state.snoozeEnabled}
-            showSnoozed={state.showSnoozed}
-            setShowSnoozed={state.setShowSnoozed}
-            activeFilterCount={g.activeFilterCount}
-            clearAllFilters={g.clearAllFilters}
-            staleOnly={state.staleOnly}
-            setStaleOnly={state.setStaleOnly}
-            staleCount={g.staleCount}
-            staleThresholdDays={g.staleThresholdDays}
-            setColumnMenuRect={state.setColumnMenuRect}
-          />
-        </div>
-
-        {previewVisible ? (
-          <>
-            <ResizeHandle
-              ariaLabel="Resize work item preview"
-              className="hidden xl:flex"
-              direction={-1}
-              max={state.previewMaxWidth}
-              min={300}
-              onChange={state.setPreviewWidth}
-              onReset={state.resetPreviewWidth}
-              value={state.previewWidth}
-            />
-
-            <WorkItemPreviewPanel
-              customPreviewFields={state.customPreviewFields}
-              focusCommentRequest={state.focusCommentRequest}
-              onCustomPreviewFieldsChange={(fields) => {
-                storeCustomPreviewFields(fields);
-                state.setCustomPreviewFields(fields);
-              }}
-              openAssigneeRequest={state.openAssigneeRequest}
-              openFieldRequest={state.openFieldRequest}
-              openPriorityRequest={state.openPriorityRequest}
-              openStateRequest={state.openStateRequest}
-              preview={g.previewQuery.data ?? null}
-              previewError={g.previewQuery.isError ? commandErrorMessage(g.previewQuery.error) : null}
-              previewLoading={g.previewQuery.isFetching}
-              selectedItem={g.selectedItem}
-              onPreviewUpdated={g.handlePreviewUpdated}
-              onDuplicate={(draft) =>
-                setDuplicateDraft({
-                  projectId: draft.projectId,
-                  workItemType: draft.workItemType ?? undefined,
-                  title: draft.title,
-                  priority: draft.priority ?? undefined,
-                  areaPath: draft.areaPath ?? undefined,
-                  iterationPath: draft.iterationPath ?? undefined,
-                  tags: draft.tags.join("; "),
-                  assignedTo: draft.assignedTo ?? undefined,
-                })
-              }
-            />
-          </>
-        ) : null}
-      </div>
+      {previewVisible ? (
+        <DockableWorkspace
+          storageKey={`${previewStorageKey}:dockview:v1`}
+          panels={[
+            { id: 'grid', title: 'Work items', content: gridPane, minWidth: 480 },
+            {
+              id: 'preview',
+              title: 'Preview',
+              content: previewPane,
+              position: { relativeTo: 'grid', direction: 'right' },
+              initialWidth: DEFAULT_WORK_ITEM_PREVIEW_WIDTH,
+              minWidth: 300,
+              maxWidth: MAX_WORK_ITEM_PREVIEW_WIDTH,
+            },
+            {
+              // Tabbed together with Preview by default -- the investigation
+              // result is auxiliary content the user can drag into its own
+              // split or floating window, not something that should crowd
+              // the main preview open by default.
+              id: 'result',
+              title: 'Result',
+              content: resultPane,
+              position: { relativeTo: 'preview', direction: 'within' },
+              minWidth: 320,
+            },
+          ] satisfies DockablePanelSpec[]}
+        />
+      ) : (
+        gridPane
+      )}
       {state.openFilterCol && state.filterAnchorRect ? (
         <WiColumnFilterDropdown
           anchorRect={state.filterAnchorRect}

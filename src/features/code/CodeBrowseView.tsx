@@ -8,6 +8,8 @@ import {
 import { useActiveOrganization } from "@/lib/useActiveConnection";
 import { openExternalUrl } from "@/lib/openExternal";
 import { FilterableSelect } from "@/features/pipelines/FilterableSelect";
+import { DockableWorkspace, type DockablePanelSpec } from "@/components/DockableWorkspace";
+import { PreviewEmptyState } from "@/components/StateDisplay";
 import {
   ancestorFolders,
   blameUrl,
@@ -24,14 +26,12 @@ import {
 } from "./codeBrowseStorage";
 import { TreeLevel } from "./CodeFileTree";
 import { CodeFilteredTree } from "./CodeFilteredTree";
-import { Breadcrumb, TabButton } from "./CodeBrowseChrome";
+import { Breadcrumb } from "./CodeBrowseChrome";
 import { CodeFolderView } from "./CodeFolderView";
 import { CodeFileView } from "./CodeFileView";
 import { CodeHistoryView } from "./CodeHistoryView";
 import { CodeCompareView } from "./CodeCompareView";
 import { CodeSearchResults } from "./CodeSearchResults";
-
-type RightTab = "contents" | "history" | "compare";
 
 const INPUT_CLASS =
   "h-9 w-full rounded-md border border-input bg-background pl-8 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring";
@@ -119,7 +119,16 @@ export function CodeBrowseView() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [filterText, setFilterText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [tab, setTab] = useState<RightTab>("contents");
+  // Imperatively brings the Contents panel's tab to the front, e.g. after
+  // opening a file or picking a commit from History -- even if the user had
+  // manually switched to a different tab. Bump `key` to re-trigger the same id.
+  const [activateContents, setActivateContents] = useState<{ id: string; key: number }>({
+    id: "contents",
+    key: 0,
+  });
+  function focusContents() {
+    setActivateContents((prev) => ({ id: "contents", key: prev.key + 1 }));
+  }
   const [baseBranch, setBaseBranch] = useState("");
   // A commit picked via History > View, pinning the Contents tab to that ref.
   const [pinnedCommit, setPinnedCommit] = useState<{
@@ -153,15 +162,14 @@ export function CodeBrowseView() {
     );
     setFilterText("");
     setSearchQuery("");
-    setTab("contents");
+    focusContents();
     setBaseBranch("");
     setPinnedCommit(null);
+    // `focusContents` (via `setActivateContents`) is intentionally excluded --
+    // it always targets a fixed id and only its bumped `key` matters, not a
+    // fresh function identity on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repositoryId, branch]);
-
-  // Compare only applies to files; fall back to Contents when a folder is shown.
-  useEffect(() => {
-    if (selected.isFolder && tab === "compare") setTab("contents");
-  }, [selected.isFolder, tab]);
 
   function toggleFolder(path: string) {
     setExpanded((prev) => {
@@ -181,7 +189,7 @@ export function CodeBrowseView() {
   function openFile(path: string) {
     setSelected({ path, isFolder: false });
     setSearchQuery("");
-    setTab("contents");
+    focusContents();
     setPinnedCommit(null);
   }
 
@@ -261,6 +269,80 @@ export function CodeBrowseView() {
     [branches],
   );
   const isFavorite = !!repo && favorites.includes(repo.repositoryId);
+
+  const codePanels: DockablePanelSpec[] = repo
+    ? [
+        {
+          id: "contents",
+          title: "Contents",
+          content: selected.isFolder ? (
+            <CodeFolderView
+              organization={organization}
+              organizationId={organizationId}
+              repo={repo}
+              branch={branch}
+              path={selected.path}
+              onOpenFolder={openFolder}
+              onOpenFile={openFile}
+            />
+          ) : (
+            <CodeFileView
+              organizationId={organizationId}
+              repo={repo}
+              branch={branch}
+              path={selected.path}
+              version={
+                pinnedCommit
+                  ? { versionType: "commit", version: pinnedCommit.commitId }
+                  : undefined
+              }
+              versionLabel={pinnedCommit ? `commit ${pinnedCommit.shortId}` : undefined}
+              onExitVersion={() => setPinnedCommit(null)}
+            />
+          ),
+        },
+        {
+          id: "history",
+          title: "History",
+          content: (
+            <CodeHistoryView
+              organization={organization}
+              organizationId={organizationId}
+              repo={repo}
+              branch={branch}
+              path={selected.path}
+              onViewAtCommit={
+                !selected.isFolder
+                  ? (commit) => {
+                      setPinnedCommit({ commitId: commit.commitId, shortId: commit.shortId });
+                      focusContents();
+                    }
+                  : undefined
+              }
+            />
+          ),
+          position: { relativeTo: "contents", direction: "within" },
+        },
+        {
+          id: "compare",
+          title: "Compare",
+          content: selected.isFolder ? (
+            <PreviewEmptyState message="Select a file to compare." />
+          ) : (
+            <CodeCompareView
+              organizationId={organizationId}
+              repo={repo}
+              branch={branch}
+              branchOptions={branchOptions}
+              baseBranch={baseBranch}
+              onBaseBranchChange={setBaseBranch}
+              path={selected.path}
+            />
+          ),
+          position: { relativeTo: "contents", direction: "within" },
+        },
+      ]
+    : [];
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
@@ -373,28 +455,13 @@ export function CodeBrowseView() {
           ) : (
             <div className="flex min-h-0 flex-1 flex-col">
               <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
-                <div className="flex min-w-0 items-center gap-3">
-                  <Breadcrumb
-                    path={selected.path}
-                    repositoryName={repo.repositoryName}
-                    onNavigate={(target) =>
-                      target === "/" ? setSelected(ROOT) : openFolder(target)
-                    }
-                  />
-                  <div className="flex shrink-0 gap-1 text-sm">
-                    <TabButton active={tab === "contents"} onClick={() => setTab("contents")}>
-                      Contents
-                    </TabButton>
-                    <TabButton active={tab === "history"} onClick={() => setTab("history")}>
-                      History
-                    </TabButton>
-                    {!selected.isFolder ? (
-                      <TabButton active={tab === "compare"} onClick={() => setTab("compare")}>
-                        Compare
-                      </TabButton>
-                    ) : null}
-                  </div>
-                </div>
+                <Breadcrumb
+                  path={selected.path}
+                  repositoryName={repo.repositoryName}
+                  onNavigate={(target) =>
+                    target === "/" ? setSelected(ROOT) : openFolder(target)
+                  }
+                />
                 <div className="flex shrink-0 items-center gap-3">
                   {!selected.isFolder ? (
                     <button
@@ -416,61 +483,12 @@ export function CodeBrowseView() {
                   </button>
                 </div>
               </div>
-              <div className="min-h-0 flex-1 overflow-auto">
-                {tab === "history" ? (
-                  <CodeHistoryView
-                    organization={organization}
-                    organizationId={organizationId}
-                    repo={repo}
-                    branch={branch}
-                    path={selected.path}
-                    onViewAtCommit={
-                      !selected.isFolder
-                        ? (commit) => {
-                            setPinnedCommit({
-                              commitId: commit.commitId,
-                              shortId: commit.shortId,
-                            });
-                            setTab("contents");
-                          }
-                        : undefined
-                    }
-                  />
-                ) : tab === "compare" && !selected.isFolder ? (
-                  <CodeCompareView
-                    organizationId={organizationId}
-                    repo={repo}
-                    branch={branch}
-                    branchOptions={branchOptions}
-                    baseBranch={baseBranch}
-                    onBaseBranchChange={setBaseBranch}
-                    path={selected.path}
-                  />
-                ) : selected.isFolder ? (
-                  <CodeFolderView
-                    organization={organization}
-                    organizationId={organizationId}
-                    repo={repo}
-                    branch={branch}
-                    path={selected.path}
-                    onOpenFolder={openFolder}
-                    onOpenFile={openFile}
-                  />
-                ) : (
-                  <CodeFileView
-                    organizationId={organizationId}
-                    repo={repo}
-                    branch={branch}
-                    path={selected.path}
-                    version={
-                      pinnedCommit
-                        ? { versionType: "commit", version: pinnedCommit.commitId }
-                        : undefined
-                    }
-                    versionLabel={pinnedCommit ? `commit ${pinnedCommit.shortId}` : undefined}
-                    onExitVersion={() => setPinnedCommit(null)}
-                  />
-                )}
+              <div className="min-h-0 flex-1">
+                <DockableWorkspace
+                  storageKey="code-browse-view"
+                  panels={codePanels}
+                  activatePanel={activateContents}
+                />
               </div>
             </div>
           )}

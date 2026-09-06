@@ -14,7 +14,6 @@ import { pushToast } from '@/lib/toast';
 import { recordUsage } from '@/lib/usageStats';
 import { useExperimentalFlags } from '@/features/settings/useExperimentalFlags';
 import { matchesAllSearchTerms, splitSearchTerms } from '@/lib/utils';
-import { useAdaptivePreviewWidth } from '@/lib/useAdaptivePreviewWidth';
 import { useGridColumns } from '@/lib/useGridColumns';
 import { useColumnVisibility } from '@/lib/useColumnVisibility';
 import { useGridVirtualizer } from '@/lib/useGridVirtualizer';
@@ -39,10 +38,7 @@ import {
 } from './myReviewsHelpers';
 import {
   DEFAULT_PR_GRID_COLUMN_WIDTHS,
-  DEFAULT_REVIEW_PREVIEW_WIDTH,
   FILTERABLE_COLUMNS,
-  MAX_REVIEW_PREVIEW_WIDTH,
-  MIN_REVIEW_PREVIEW_WIDTH,
   PR_GRID_COLUMN_MAX_WIDTHS,
   PR_GRID_COLUMN_MIN_WIDTHS,
   PR_GRID_COLUMN_WIDTHS_STORAGE_KEY,
@@ -50,7 +46,6 @@ import {
   PR_GRID_OVERSCAN,
   PR_GRID_REQUIRED_COLUMNS,
   PR_GRID_ROW_HEIGHT,
-  REVIEW_PREVIEW_WIDTH_STORAGE_KEY,
   REVIEW_SECTION_LABELS,
   REVIEW_SECTION_ORDER,
   type FilterableColumn,
@@ -95,13 +90,7 @@ export function useMyReviewsGrid({
   const [copyToast, setCopyToast] = useState<string | null>(null);
   const [maximized, setMaximized] = useState(false);
   const [columnMenuRect, setColumnMenuRect] = useState<DOMRect | null>(null);
-  const previewLayout = useAdaptivePreviewWidth({
-    defaultWidth: DEFAULT_REVIEW_PREVIEW_WIDTH,
-    maxPreviewWidth: MAX_REVIEW_PREVIEW_WIDTH,
-    minPreviewWidth: MIN_REVIEW_PREVIEW_WIDTH,
-    storageKey: `${REVIEW_PREVIEW_WIDTH_STORAGE_KEY}:ratio`,
-  });
-  const { containerRef } = previewLayout;
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const filterInputRef = useRef<HTMLInputElement | null>(null);
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -434,10 +423,6 @@ export function useMyReviewsGrid({
     // grid layout
     COLS, gridMinWidth, columnResizeProps, scrollerRef,
     virtualTopPadding, virtualBottomPadding, virtualRows,
-    previewWidth: previewLayout.width,
-    previewMaxWidth: previewLayout.max,
-    setPreviewWidth: previewLayout.setWidth,
-    resetPreviewWidth: previewLayout.resetWidth,
     maximized, setMaximized,
     columnMenuRect, setColumnMenuRect,
     // filter / sort state

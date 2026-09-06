@@ -36,12 +36,18 @@ const viewResults = [
 async function openViewsScreen() {
   renderApp();
   const main = within(await screen.findByRole("main"));
-  await screen.findByText("No pull requests assigned to you.");
-  fireEvent.click(
-    within(screen.getByRole("navigation", { name: "Primary navigation" })).getByRole("button", {
-      name: "Views",
-    }),
-  );
+  // Some tests call this twice in one test to verify a setting survives a
+  // remount, and the dockable layout itself now also persists across
+  // remounts -- so the second call may already land on Work Item Views
+  // instead of My Reviews. Wait for the nav to be interactive rather than
+  // for My Reviews' specific content, which is not guaranteed to render.
+  const nav = within(screen.getByRole("navigation", { name: "Primary navigation" }));
+  await waitFor(() => {
+    if ((nav.getByRole("button", { name: "Views" }) as HTMLButtonElement).disabled) {
+      throw new Error("nav not ready yet");
+    }
+  });
+  fireEvent.click(nav.getByRole("button", { name: "Views" }));
   return main;
 }
 
@@ -245,8 +251,17 @@ describe("App — Work Item Views UX", () => {
     invokeMock.mockClear();
     fireEvent.click(main.getByRole("button", { name: /^Test$/ }));
 
-    // The message lands in the test-result strip, not only the inline validation list.
-    const status = await screen.findByRole("status");
+    // The message lands in the test-result strip, not only the inline validation
+    // list. `role="status"` is no longer unique -- the dockable layout adds its
+    // own visually-hidden live region for screen-reader announcements -- so find
+    // the one that actually carries this message.
+    const status = await waitFor(() => {
+      const match = screen
+        .getAllByRole("status")
+        .find((el) => /WIQL must start with SELECT/.test(el.textContent ?? ""));
+      if (!match) throw new Error("validation status not found yet");
+      return match;
+    });
     expect(status.textContent).toMatch(/WIQL must start with SELECT/);
     expect(
       invokeMock.mock.calls.some(([command]) => command === "count_work_item_query"),

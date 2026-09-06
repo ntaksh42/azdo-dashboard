@@ -129,7 +129,7 @@ function approvedBadge(review: PullRequestReview | null) {
 }
 
 // Comment activity badge. Counts only threads that carry a human comment
-// (mirrors the user-thread filter in PrReviewPanel) so auto-generated system
+// (mirrors the user-thread filter in usePrReviewPanels) so auto-generated system
 // threads such as votes and ref updates do not inflate the number. Highlights
 // when any thread is still unresolved; renders nothing when there are no
 // comment threads so an empty PR does not show a "0".
@@ -255,7 +255,7 @@ export function PrReviewHeader({
   ].filter(Boolean);
 
   return (
-    <div className="flex shrink-0 flex-col gap-1 border-b border-border px-3 py-1.5">
+    <div className="flex shrink-0 flex-col gap-1 border-b border-border px-2 py-1">
       <div className="flex items-center gap-2">
         <StateBadge isDraft={isDraft} />
         <span className="shrink-0 font-mono text-xs font-semibold text-muted-foreground">
@@ -280,57 +280,57 @@ export function PrReviewHeader({
           {title}
         </span>
       ) : null}
-      <p className="truncate text-xs text-muted-foreground">
-        {createdBy ?? "Unknown"}
-        {creationDate ? ` · opened ${formatRelativeDate(creationDate)}` : ""}
-      </p>
-      {badges.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1">{badges}</div>
-      ) : null}
-      {review && review.reviewers.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-1">
-          {review.reviewers.map((reviewer) => (
-            <span
-              key={reviewer.id ?? `${reviewer.displayName}-${reviewer.isMe}`}
-              className="inline-flex items-center gap-1 rounded border border-border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
-              title={`${reviewer.voteLabel}${reviewer.isRequired ? " (Required)" : ""}`}
-            >
-              {reviewer.displayName}
-              {reviewer.isMe ? " (you)" : ""}
+      <div
+        role="group"
+        aria-label="Pull request metadata"
+        className="flex min-w-0 flex-wrap items-center gap-1"
+      >
+        <p className="mr-1 min-w-0 truncate text-xs text-muted-foreground">
+          {createdBy ?? "Unknown"}
+          {creationDate ? ` · opened ${formatRelativeDate(creationDate)}` : ""}
+        </p>
+        {badges}
+        {review
+          ? review.reviewers.map((reviewer) => (
               <span
-                className={`inline-block h-1.5 w-1.5 rounded-full ${VOTE_DOT_CLASSES[voteTone(reviewer.vote)]}`}
-                aria-hidden="true"
-              />
-              {reviewer.id && onToggleReviewerRequired && onRemoveReviewer ? (
-                <>
-                  <button
-                    type="button"
-                    disabled={reviewerActionsBusy}
-                    onClick={() => onToggleReviewerRequired(reviewer)}
-                    title={
-                      reviewer.isRequired ? "Make optional" : "Make required"
-                    }
-                    aria-label={`${reviewer.isRequired ? "Make optional" : "Make required"}: ${reviewer.displayName}`}
-                    className="rounded px-1 text-[10px] font-medium uppercase tracking-wide hover:bg-background disabled:opacity-50"
-                  >
-                    {reviewer.isRequired ? "Req" : "Opt"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={reviewerActionsBusy}
-                    onClick={() => onRemoveReviewer(reviewer)}
-                    aria-label={`Remove reviewer ${reviewer.displayName}`}
-                    title="Remove reviewer"
-                    className="rounded p-0.5 hover:bg-background hover:text-destructive disabled:opacity-50"
-                  >
-                    <X className="h-3 w-3" aria-hidden="true" />
-                  </button>
-                </>
-              ) : null}
-            </span>
-          ))}
-        </div>
-      ) : null}
+                key={reviewer.id ?? `${reviewer.displayName}-${reviewer.isMe}`}
+                className="inline-flex items-center gap-1 rounded border border-border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                title={`${reviewer.voteLabel}${reviewer.isRequired ? " (Required)" : ""}`}
+              >
+                {reviewer.displayName}
+                {reviewer.isMe ? " (you)" : ""}
+                <span
+                  className={`inline-block h-1.5 w-1.5 rounded-full ${VOTE_DOT_CLASSES[voteTone(reviewer.vote)]}`}
+                  aria-hidden="true"
+                />
+                {reviewer.id && onToggleReviewerRequired && onRemoveReviewer ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={reviewerActionsBusy}
+                      onClick={() => onToggleReviewerRequired(reviewer)}
+                      title={reviewer.isRequired ? "Make optional" : "Make required"}
+                      aria-label={`${reviewer.isRequired ? "Make optional" : "Make required"}: ${reviewer.displayName}`}
+                      className="rounded px-1 text-[10px] font-medium uppercase tracking-wide hover:bg-background disabled:opacity-50"
+                    >
+                      {reviewer.isRequired ? "Req" : "Opt"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={reviewerActionsBusy}
+                      onClick={() => onRemoveReviewer(reviewer)}
+                      aria-label={`Remove reviewer ${reviewer.displayName}`}
+                      title="Remove reviewer"
+                      className="rounded p-0.5 hover:bg-background hover:text-destructive disabled:opacity-50"
+                    >
+                      <X className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                  </>
+                ) : null}
+              </span>
+            ))
+          : null}
+      </div>
     </div>
   );
 }

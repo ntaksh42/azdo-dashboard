@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Play, Plus } from "lucide-react";
 import {
@@ -9,8 +9,7 @@ import {
   updatePipelineApproval,
 } from "@/lib/azdoCommands";
 import { useActiveOrganizationId } from "@/lib/useActiveConnection";
-import { ResizeHandle } from "@/components/ResizeHandle";
-import { useAdaptivePreviewWidth } from "@/lib/useAdaptivePreviewWidth";
+import { DockableWorkspace, type DockablePanelSpec } from "@/components/DockableWorkspace";
 import { FilterableSelect } from "./FilterableSelect";
 import { PipelineApprovalsPanel } from "./PipelineApprovalsPanel";
 import { PipelineDefinitionPanel } from "./PipelineDefinitionPanel";
@@ -50,13 +49,6 @@ export function PipelinesView() {
     loadPipelineSubscriptions(),
   );
   const [watchToast, setWatchToast] = useState<string | null>(null);
-  const previewLayout = useAdaptivePreviewWidth({
-    defaultWidth: DEFAULT_PIPELINE_PREVIEW_WIDTH,
-    maxPreviewWidth: MAX_PIPELINE_PREVIEW_WIDTH,
-    minPreviewWidth: MIN_PIPELINE_PREVIEW_WIDTH,
-    storageKey: `${PIPELINE_PREVIEW_WIDTH_STORAGE_KEY}:ratio`,
-  });
-
   const projectsQuery = useQuery({
     queryKey: ["pipelineProjects", selectedOrganizationId],
     queryFn: () => listPipelineProjects({ organizationId: selectedOrganizationId }),
@@ -378,63 +370,66 @@ export function PipelinesView() {
         />
       ) : null}
 
-      <div
-        ref={previewLayout.containerRef}
-        className="grid min-h-0 flex-1 items-stretch gap-3 xl:grid-cols-[minmax(0,1fr)_8px_minmax(320px,var(--pipeline-preview-width))]"
-        style={{ "--pipeline-preview-width": `${previewLayout.width}px` } as CSSProperties}
-      >
-        <PipelineSubscriptionsBoard
-          organizationId={selectedOrganizationId}
-          subscriptions={subscriptions}
-          selectedBuildId={detailTarget?.buildId ?? null}
-          onSelectRun={(selection) => setDetailTarget(selection)}
-          onRemove={(removeProjectId, removeDefinitionId) => {
-            persistSubscriptions(
-              removeSubscription(
-                subscriptions,
-                selectedOrganizationId,
-                removeProjectId,
-                removeDefinitionId,
+      <DockableWorkspace
+        storageKey={`${PIPELINE_PREVIEW_WIDTH_STORAGE_KEY}:dockview:v1`}
+        panels={[
+          {
+            id: "grid",
+            title: "Pipelines",
+            minWidth: 480,
+            content: (
+              <PipelineSubscriptionsBoard
+                organizationId={selectedOrganizationId}
+                subscriptions={subscriptions}
+                selectedBuildId={detailTarget?.buildId ?? null}
+                onSelectRun={(selection) => setDetailTarget(selection)}
+                onRemove={(removeProjectId, removeDefinitionId) => {
+                  persistSubscriptions(
+                    removeSubscription(
+                      subscriptions,
+                      selectedOrganizationId,
+                      removeProjectId,
+                      removeDefinitionId,
+                    ),
+                  );
+                  // Clear the detail panel only if it is showing a run from the exact
+                  // pipeline that was just unwatched, identified by project and
+                  // definition (other pipelines in the same project stay shown).
+                  if (
+                    detailTarget?.projectId === removeProjectId &&
+                    detailTarget?.definitionId === removeDefinitionId
+                  ) {
+                    setDetailTarget(null);
+                  }
+                }}
+              />
+            ),
+          },
+          {
+            id: "preview",
+            title: "Preview",
+            position: { relativeTo: "grid", direction: "right" },
+            initialWidth: DEFAULT_PIPELINE_PREVIEW_WIDTH,
+            minWidth: MIN_PIPELINE_PREVIEW_WIDTH,
+            maxWidth: MAX_PIPELINE_PREVIEW_WIDTH,
+            content:
+              detailTarget == null && definitionId != null && selectedDefinition ? (
+                <PipelineDefinitionPanel
+                  organizationId={selectedOrganizationId}
+                  projectId={projectId}
+                  definitionId={definitionId}
+                  definitionName={selectedDefinition.name}
+                />
+              ) : (
+                <PipelineRunDetailPanel
+                  organizationId={detailTarget?.organizationId ?? selectedOrganizationId}
+                  projectId={detailTarget?.projectId ?? projectId}
+                  buildId={detailTarget?.buildId ?? null}
+                />
               ),
-            );
-            // Clear the detail panel only if it is showing a run from the exact
-            // pipeline that was just unwatched, identified by project and
-            // definition (other pipelines in the same project stay shown).
-            if (
-              detailTarget?.projectId === removeProjectId &&
-              detailTarget?.definitionId === removeDefinitionId
-            ) {
-              setDetailTarget(null);
-            }
-          }}
-        />
-
-        <ResizeHandle
-          ariaLabel="Resize pipeline preview"
-          className="hidden xl:flex"
-          direction={-1}
-          max={previewLayout.max}
-          min={MIN_PIPELINE_PREVIEW_WIDTH}
-          onChange={previewLayout.setWidth}
-          onReset={previewLayout.resetWidth}
-          value={previewLayout.width}
-        />
-
-        {detailTarget == null && definitionId != null && selectedDefinition ? (
-          <PipelineDefinitionPanel
-            organizationId={selectedOrganizationId}
-            projectId={projectId}
-            definitionId={definitionId}
-            definitionName={selectedDefinition.name}
-          />
-        ) : (
-          <PipelineRunDetailPanel
-            organizationId={detailTarget?.organizationId ?? selectedOrganizationId}
-            projectId={detailTarget?.projectId ?? projectId}
-            buildId={detailTarget?.buildId ?? null}
-          />
-        )}
-      </div>
+          },
+        ] satisfies DockablePanelSpec[]}
+      />
 
       {watchToast && (
         <div

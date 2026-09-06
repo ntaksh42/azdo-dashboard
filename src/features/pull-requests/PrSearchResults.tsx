@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useRef, useMemo, useState } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
 import { Filter } from 'lucide-react';
 import { type PullRequestSummary } from '@/lib/azdoCommands';
 import {
@@ -15,7 +15,7 @@ import { useRangeSelection } from '@/lib/useRangeSelection';
 import { copyRowUrls } from '@/lib/copyUrls';
 import { openExternalUrl } from '@/lib/openExternal';
 import { recordRecentPullRequest } from '@/lib/recentItems';
-import { ColumnResizeHandle, ResizeHandle } from '@/components/ResizeHandle';
+import { ColumnResizeHandle } from '@/components/ResizeHandle';
 import { ColumnVisibilityMenu } from '@/components/ColumnVisibilityMenu';
 import { LoadingState } from '@/components/StateDisplay';
 import { ActiveFilters } from '@/components/ActiveFilters';
@@ -26,8 +26,8 @@ import {
   columnFilterUniqueValues,
   toggleColumnFilterValue,
 } from '@/lib/columnFilters';
-import { PrReviewPanel } from './PrReviewPanel';
-import { useAdaptivePreviewWidth } from '@/lib/useAdaptivePreviewWidth';
+import { usePrReviewPanels } from './usePrReviewPanels';
+import { DockableWorkspace, type DockablePanelSpec } from '@/components/DockableWorkspace';
 import { MemoPrSearchRow } from './MemoPrSearchRow';
 import {
   type PrSearchFilterableColumn,
@@ -94,12 +94,6 @@ export function PullRequestResults({
   const [columnMenuRect, setColumnMenuRect] = useState<DOMRect | null>(null);
   const [copyToast, setCopyToast] = useState<string | null>(null);
   const [maximized, setMaximized] = useState(false);
-  const previewLayout = useAdaptivePreviewWidth({
-    defaultWidth: DEFAULT_PR_SEARCH_PREVIEW_WIDTH,
-    maxPreviewWidth: MAX_PR_SEARCH_PREVIEW_WIDTH,
-    minPreviewWidth: MIN_PR_SEARCH_PREVIEW_WIDTH,
-    storageKey: `${PR_SEARCH_PREVIEW_WIDTH_STORAGE_KEY}:ratio`,
-  });
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const restoreFocusRef = useRef(false);
   const columnUniqueValues = useMemo(
@@ -306,21 +300,14 @@ export function PullRequestResults({
     if (selectedResult) recordRecentPullRequest(selectedResult);
   }, [selectedResult]);
 
-  return (
-    <div
-      ref={previewLayout.containerRef}
-      className={
-        maximized
-          ? "flex min-h-0 flex-1"
-          : "grid min-h-0 flex-1 items-stretch gap-3 xl:grid-cols-[minmax(0,1fr)_8px_minmax(320px,var(--pr-preview-width))]"
-      }
-      style={{ "--pr-preview-width": `${previewLayout.width}px` } as CSSProperties}
-    >
-      <div
-        className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-card ${
-          maximized ? "hidden" : ""
-        }`}
-      >
+  const { anchor: reviewAnchor, secondary: reviewSecondary } = usePrReviewPanels({
+    selectedPr,
+    maximized,
+    onToggleMaximize: () => setMaximized((value) => !value),
+  });
+
+  const gridPane = (
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-card">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <h2 className="text-base font-semibold">Results</h2>
         <span className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -432,22 +419,24 @@ export function PullRequestResults({
         </div>
       )}
       </div>
+  );
 
-      <ResizeHandle
-        ariaLabel="Resize pull request preview"
-        className={maximized ? "hidden" : "hidden xl:flex"}
-        direction={-1}
-        max={previewLayout.max}
-        min={MIN_PR_SEARCH_PREVIEW_WIDTH}
-        onChange={previewLayout.setWidth}
-        onReset={previewLayout.resetWidth}
-        value={previewLayout.width}
-      />
-
-      <PrReviewPanel
-        selectedPr={selectedPr}
-        maximized={maximized}
-        onToggleMaximize={() => setMaximized((value) => !value)}
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <DockableWorkspace
+        storageKey={`${PR_SEARCH_PREVIEW_WIDTH_STORAGE_KEY}:dockview:v2`}
+        panels={[
+          { id: 'grid', title: 'Results', content: gridPane, minWidth: 480 },
+          {
+            ...reviewAnchor,
+            position: { relativeTo: 'grid', direction: 'right' },
+            initialWidth: DEFAULT_PR_SEARCH_PREVIEW_WIDTH,
+            minWidth: MIN_PR_SEARCH_PREVIEW_WIDTH,
+            maxWidth: MAX_PR_SEARCH_PREVIEW_WIDTH,
+          },
+          ...reviewSecondary,
+        ] satisfies DockablePanelSpec[]}
+        maximizedId={maximized ? 'review' : undefined}
       />
 
       {copyToast && (

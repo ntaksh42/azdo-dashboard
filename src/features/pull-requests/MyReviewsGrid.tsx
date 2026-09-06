@@ -1,11 +1,10 @@
-import { type CSSProperties } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { commandErrorMessage } from '@/lib/azdoCommands';
 import { isEditableTarget, focusPrimaryPreview, markdownLink } from '@/lib/utils';
 import { SnoozeMenu } from '@/components/SnoozeMenu';
 import { SnoozedItemsPanel } from '@/components/SnoozedItemsPanel';
 import { ColumnResizeHandle } from '@/components/ResizeHandle';
-import { ResizeHandle } from '@/components/ResizeHandle';
+import { DockableWorkspace, type DockablePanelSpec } from '@/components/DockableWorkspace';
 import { ColumnVisibilityMenu } from '@/components/ColumnVisibilityMenu';
 import { ColumnFilterDropdown } from '@/components/ColumnFilterDropdown';
 import { SortHeaderButton } from '@/components/SortHeaderButton';
@@ -13,13 +12,22 @@ import { LoadingState, ErrorState } from '@/components/StateDisplay';
 import { openExternalUrl } from '@/lib/openExternal';
 import { copyRowUrls } from '@/lib/copyUrls';
 import { toggleTriageArchived } from '@/lib/triage';
-import { PrReviewPanel } from './PrReviewPanel';
+import { usePrReviewPanels } from './usePrReviewPanels';
 import { MemoReviewPrRow } from './MemoReviewPrRow';
 import { ReviewFilterBar } from './ReviewFilterBar';
 import { ReviewStatusBar } from './ReviewStatusBar';
 import { OverlapPopup } from './OverlapPopup';
 import { reviewTriageKey, reviewTriageSnapshot } from './myReviewsHelpers';
-import { isFilterableColumn, sortLabels, PR_GRID_KEYS, PR_GRID_REQUIRED_COLUMNS, MIN_REVIEW_PREVIEW_WIDTH } from './myReviewsTypes';
+import {
+  DEFAULT_REVIEW_PREVIEW_WIDTH,
+  isFilterableColumn,
+  MAX_REVIEW_PREVIEW_WIDTH,
+  MIN_REVIEW_PREVIEW_WIDTH,
+  PR_GRID_KEYS,
+  PR_GRID_REQUIRED_COLUMNS,
+  REVIEW_PREVIEW_WIDTH_STORAGE_KEY,
+  sortLabels,
+} from './myReviewsTypes';
 import { useMyReviewsGrid } from './useMyReviewsGrid';
 import type { MyReviewsGridProps } from './myReviewsTypes';
 
@@ -32,6 +40,11 @@ export function MyReviewsGrid({
   onSelectRequestHandled,
 }: MyReviewsGridProps) {
   const g = useMyReviewsGrid({ selectRequest, onSelectRequestHandled });
+  const { anchor: reviewAnchor, secondary: reviewSecondary } = usePrReviewPanels({
+    selectedPr: g.selectedPr,
+    maximized: g.maximized,
+    onToggleMaximize: () => g.setMaximized((v) => !v),
+  });
 
   function handleKeyDown(e: React.KeyboardEvent) {
     const editable = isEditableTarget(e.target);
@@ -219,17 +232,15 @@ export function MyReviewsGrid({
         onShowDraftsChange={(checked) => { g.setShowDrafts(checked); g.setSelectedIndex(0); }}
         filterSuggestionPool={g.filterSuggestionPool}
       />
-      <div
-        className={
-          g.maximized
-            ? 'flex min-h-0 flex-1'
-            : 'grid min-h-0 flex-1 items-stretch gap-3 xl:grid-cols-[minmax(0,1fr)_8px_minmax(280px,var(--review-preview-width))]'
-        }
-        style={{ '--review-preview-width': `${g.previewWidth}px` } as CSSProperties}
-      >
-        <div
-          className={`flex min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card ${g.maximized ? 'hidden' : ''}`}
-        >
+      <DockableWorkspace
+        storageKey={`${REVIEW_PREVIEW_WIDTH_STORAGE_KEY}:dockview:v2`}
+        panels={[
+          {
+            id: 'grid',
+            title: 'Reviews',
+            minWidth: 480,
+            content: (
+        <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-card">
           {g.showSnoozed ? (
             <SnoozedItemsPanel
               organizationId={g.organizationId}
@@ -345,22 +356,19 @@ export function MyReviewsGrid({
             }}
           />
         </div>
-        <ResizeHandle
-          ariaLabel="Resize review preview"
-          className={g.maximized ? 'hidden' : 'hidden xl:flex'}
-          direction={-1}
-          max={g.previewMaxWidth}
-          min={MIN_REVIEW_PREVIEW_WIDTH}
-          onChange={g.setPreviewWidth}
-          onReset={g.resetPreviewWidth}
-          value={g.previewWidth}
-        />
-        <PrReviewPanel
-          selectedPr={g.selectedPr}
-          maximized={g.maximized}
-          onToggleMaximize={() => g.setMaximized((v) => !v)}
-        />
-      </div>
+            ),
+          },
+          {
+            ...reviewAnchor,
+            position: { relativeTo: 'grid', direction: 'right' },
+            initialWidth: DEFAULT_REVIEW_PREVIEW_WIDTH,
+            minWidth: MIN_REVIEW_PREVIEW_WIDTH,
+            maxWidth: MAX_REVIEW_PREVIEW_WIDTH,
+          },
+          ...reviewSecondary,
+        ] satisfies DockablePanelSpec[]}
+        maximizedId={g.maximized ? 'review' : undefined}
+      />
       {g.openFilterCol && g.filterAnchorRect ? (
         <ColumnFilterDropdown
           anchorRect={g.filterAnchorRect}

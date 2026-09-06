@@ -5,3 +5,13 @@ import { configure } from "@testing-library/react";
 // load the default 1000ms `findBy*` timeout can be exceeded on slower machines.
 // Raise the async utility timeout to keep these heavy renders from flaking.
 configure({ asyncUtilTimeout: 15000 });
+
+// jsdom has no ResizeObserver; dockview (DockableWorkspace) requires one to size
+// its panels, so tests rendering it need at least a no-op stub.
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}

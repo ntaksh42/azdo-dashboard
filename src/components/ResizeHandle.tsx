@@ -17,6 +17,7 @@ function beginHorizontalResize(
   },
 ) {
   event.preventDefault();
+  event.stopPropagation();
   const target = event.currentTarget;
   const pointerId = event.pointerId;
   const startX = event.clientX;

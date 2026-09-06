@@ -113,7 +113,7 @@ export function PipelineDefinitionPanel({
   }
 
   return (
-    <aside className="flex min-h-0 flex-col overflow-hidden rounded-md border border-border bg-card">
+    <aside className="flex h-full min-h-0 flex-col overflow-hidden rounded-md border border-border bg-card">
       <div className="border-b border-border p-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">

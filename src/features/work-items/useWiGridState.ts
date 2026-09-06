@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { snoozeItems, type WorkItemSummary } from '@/lib/azdoCommands';
 import { useGridColumns } from '@/lib/useGridColumns';
-import { useAdaptivePreviewWidth } from '@/lib/useAdaptivePreviewWidth';
 import type { CustomPreviewField } from './previewFieldsStorage';
 import { loadCustomPreviewFields } from './previewFieldsStorage';
 import { workItemQueryKeys } from './queryKeys';
@@ -14,9 +13,6 @@ import {
   WI_VISIBLE_COLUMNS_STORAGE_KEY,
   WI_SORT_STORAGE_KEY,
   WI_COLUMN_FILTERS_STORAGE_KEY,
-  DEFAULT_WORK_ITEM_PREVIEW_WIDTH,
-  MAX_WORK_ITEM_PREVIEW_WIDTH,
-  WORK_ITEM_PREVIEW_WIDTH_STORAGE_KEY,
   WI_GRID_KEYS,
   WI_GRID_REQUIRED_COLUMNS,
   loadVisibleWorkItemColumns,
@@ -54,10 +50,6 @@ export function useWiGridState({
   const columnFiltersStorageKey = storageKeyScope
     ? `${WI_COLUMN_FILTERS_STORAGE_KEY}:${storageKeyScope}`
     : WI_COLUMN_FILTERS_STORAGE_KEY;
-  const previewWidthStorageKey = storageKeyScope
-    ? `${WORK_ITEM_PREVIEW_WIDTH_STORAGE_KEY}:${storageKeyScope}`
-    : WORK_ITEM_PREVIEW_WIDTH_STORAGE_KEY;
-
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [sort, setWiSort] = useState<WiSortState>(
     initialSort ?? loadWorkItemSort(sortStorageKey, defaultWorkItemSort()),
@@ -81,12 +73,6 @@ export function useWiGridState({
     prefixColumns: ["28px"],
     suffixColumns: extraColumns.map(() => "120px"),
   });
-  const previewLayout = useAdaptivePreviewWidth({
-    defaultWidth: DEFAULT_WORK_ITEM_PREVIEW_WIDTH,
-    maxPreviewWidth: MAX_WORK_ITEM_PREVIEW_WIDTH,
-    minPreviewWidth: 300,
-    storageKey: `${previewWidthStorageKey}:ratio`,
-  });
   const [copyToast, setCopyToast] = useState<string | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [lastCheckedIndex, setLastCheckedIndex] = useState<number | null>(null);
@@ -109,7 +95,7 @@ export function useWiGridState({
   // close instead of being stranded on <body>.
   const filterButtonRef = useRef<HTMLElement | null>(null);
   const [staleOnly, setStaleOnly] = useState(false);
-  const { containerRef } = previewLayout;
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const gridScrollRef = useRef<HTMLDivElement | null>(null);
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const previousResultKeysRef = useRef<string | null>(null);
@@ -194,10 +180,6 @@ export function useWiGridState({
     visibleColumns, setVisibleColumns,
     toggleColumnVisibility, resetColumnVisibility,
     wiColTemplate, gridMinWidth, resetColumnWidths, columnResizeProps,
-    previewWidth: previewLayout.width,
-    previewMaxWidth: previewLayout.max,
-    setPreviewWidth: previewLayout.setWidth,
-    resetPreviewWidth: previewLayout.resetWidth,
     copyToast, setCopyToast,
     checkedIds, setCheckedIds,
     lastCheckedIndex, setLastCheckedIndex,

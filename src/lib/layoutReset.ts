@@ -1,8 +1,9 @@
 /**
- * Layout width persistence lives in localStorage under the `azdodeck:layout:`
+ * Layout persistence lives in localStorage under the `azdodeck:layout:`
  * prefix (sidebar width, preview widths, grid column widths, column
- * visibility). These widths are easy to break by dragging and hard to restore,
- * so this helper resets them in one place.
+ * visibility, and the dockview panel arrangements -- which views/panes are
+ * docked where, and their sizes). These are easy to break by dragging and
+ * hard to restore, so this helper resets them all in one place.
  *
  * Only layout keys are removed: saved Work Item Views, command palette usage,
  * organizations, and credentials use different prefixes and are left untouched.

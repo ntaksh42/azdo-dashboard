@@ -140,7 +140,7 @@ export function CommitPreviewPanel({
   return (
     <aside
       onKeyDown={handleKeyDown}
-      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-card focus-within:ring-2 focus-within:ring-ring"
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border bg-card focus-within:ring-2 focus-within:ring-ring"
     >
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5">
         {commit ? (
